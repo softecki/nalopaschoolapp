@@ -32,6 +32,18 @@ class DatabaseHelper {
     return null;
   }
 
+  // API values may arrive as int/double/bool/List even for text columns.
+  static String? _toStr(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value;
+    if (value is List || value is Map) return jsonEncode(value);
+    return value.toString();
+  }
+
+  static String _toStrRequired(dynamic value, {String defaultValue = ''}) {
+    return _toStr(value) ?? defaultValue;
+  }
+
   static int _toIntRequired(dynamic value, {int defaultValue = 0}) {
     if (value == null) return defaultValue;
     if (value is int) return value;
@@ -487,14 +499,14 @@ class DatabaseHelper {
       await driftDb.into(driftDb.studentsList).insertOnConflictUpdate(
         StudentsListCompanion(
           id: student['id'] != null && student['id'].toString().isNotEmpty ? Value(_toIntRequired(student['id'])) : const Value.absent(),
-          admissionNo: Value(student['admission_no'] as String?),
+          admissionNo: Value(_toStr(student['admission_no'])),
           rollNo: Value(_toInt(student['roll_no'])),
-          firstName: Value(student['first_name'] as String?),
-          lastName: Value(student['last_name'] as String?),
-          mobile: Value(student['mobile'] as String?),
-          email: Value(student['email'] as String?),
-          dob: Value(student['dob'] as String?),
-          admissionDate: Value(student['admission_date'] as String?),
+          firstName: Value(_toStr(student['first_name'])),
+          lastName: Value(_toStr(student['last_name'])),
+          mobile: Value(_toStr(student['mobile'])),
+          email: Value(_toStr(student['email'])),
+          dob: Value(_toStr(student['dob'])),
+          admissionDate: Value(_toStr(student['admission_date'])),
           studentCategoryId: Value(_toInt(student['student_category_id'])),
           religionId: Value(_toInt(student['religion_id'])),
           bloodGroupId: Value(_toInt(student['blood_group_id'])),
@@ -503,20 +515,20 @@ class DatabaseHelper {
           imageId: Value(_toInt(student['image_id'])),
           parentGuardianId: Value(_toInt(student['parent_guardian_id'])),
           userId: Value(_toInt(student['user_id'])),
-          uploadDocuments: Value(student['upload_documents'] as String?),
+          uploadDocuments: Value(_toStr(student['upload_documents'])),
           status: Value(_toInt(student['status'])),
           previousSchool: Value(_toInt(student['previous_school'])),
-          previousSchoolInfo: Value(student['previous_school_info'] as String?),
+          previousSchoolInfo: Value(_toStr(student['previous_school_info'])),
           previousSchoolImageId: Value(_toInt(student['previous_school_image_id'])),
-          placeOfBirth: Value(student['place_of_birth'] as String?),
-          nationality: Value(student['nationality'] as String?),
-          cprNo: Value(student['cpr_no'] as String?),
-          spokenLangAtHome: Value(student['spoken_lang_at_home'] as String?),
-          residanceAddress: Value(student['residance_address'] as String?),
-          controlNumber: Value(student['control_number'] as String?),
-          available: Value(student['available'] as String?),
-          createdAt: Value(student['created_at'] as String?),
-          updatedAt: Value(student['updated_at'] as String?),
+          placeOfBirth: Value(_toStr(student['place_of_birth'])),
+          nationality: Value(_toStr(student['nationality'])),
+          cprNo: Value(_toStr(student['cpr_no'])),
+          spokenLangAtHome: Value(_toStr(student['spoken_lang_at_home'])),
+          residanceAddress: Value(_toStr(student['residance_address'])),
+          controlNumber: Value(_toStr(student['control_number'])),
+          available: Value(_toStr(student['available'])),
+          createdAt: Value(_toStr(student['created_at'])),
+          updatedAt: Value(_toStr(student['updated_at'])),
         ),
       );
     } else {
@@ -541,16 +553,16 @@ class DatabaseHelper {
       await driftDb.into(driftDb.noticeBoards).insertOnConflictUpdate(
         NoticeBoardsCompanion(
           id: notice['id'] != null && notice['id'].toString().isNotEmpty ? Value(_toIntRequired(notice['id'])) : const Value.absent(),
-          title: Value(notice['title'] as String?),
-          date: Value(notice['date'] as String?),
-          publishDate: Value(notice['publish_date'] as String?),
+          title: Value(_toStr(notice['title'])),
+          date: Value(_toStr(notice['date'])),
+          publishDate: Value(_toStr(notice['publish_date'])),
           description: Value(cleanedDescription as String?),
-          attachment: Value(notice['attachment'] as String?),
+          attachment: Value(_toStr(notice['attachment'])),
           isVisibleWeb: Value(_toInt(notice['is_visible_web'])),
           status: Value(_toInt(notice['status'])),
-          visibleTo: Value(notice['visible_to'] as String?),
-          createdAt: Value(notice['created_at'] as String?),
-          updatedAt: Value(notice['updated_at'] as String?),
+          visibleTo: Value(_toStr(notice['visible_to'])),
+          createdAt: Value(_toStr(notice['created_at'])),
+          updatedAt: Value(_toStr(notice['updated_at'])),
         ),
       );
     } else {
@@ -583,18 +595,18 @@ class DatabaseHelper {
       await driftDb.into(driftDb.staff).insertOnConflictUpdate(
         StaffCompanion(
           id: staff['id'] != null && staff['id'].toString().isNotEmpty ? Value(_toIntRequired(staff['id'])) : const Value.absent(),
-          userId: Value(staff['user_id'] as String),
-          staffId: Value(staff['staff_id'] as String),
-          roleId: Value(staff['role_id'] as String),
-          designationId: Value(staff['designation_id'] as String),
-          departmentId: Value(staff['department_id'] as String),
-          firstName: Value(staff['first_name'] as String?),
-          lastName: Value(staff['last_name'] as String?),
-          email: Value(staff['email'] as String?),
-          genderId: Value(staff['gender_id'] as String?),
-          status: Value(staff['status'] as String?),
-          createdAt: Value(staff['created_at'] as String?),
-          updatedAt: Value(staff['updated_at'] as String?),
+          userId: Value(_toStrRequired(staff['user_id'])),
+          staffId: Value(_toStrRequired(staff['staff_id'])),
+          roleId: Value(_toStrRequired(staff['role_id'])),
+          designationId: Value(_toStrRequired(staff['designation_id'])),
+          departmentId: Value(_toStrRequired(staff['department_id'])),
+          firstName: Value(_toStr(staff['first_name'])),
+          lastName: Value(_toStr(staff['last_name'])),
+          email: Value(_toStr(staff['email'])),
+          genderId: Value(_toStr(staff['gender_id'])),
+          status: Value(_toStr(staff['status'])),
+          createdAt: Value(_toStr(staff['created_at'])),
+          updatedAt: Value(_toStr(staff['updated_at'])),
         ),
       );
     } else {
@@ -613,12 +625,12 @@ class DatabaseHelper {
       await driftDb.into(driftDb.subjectAssigns).insertOnConflictUpdate(
         SubjectAssignsCompanion(
           id: _toIntRequired(subject_assigns['id']) != 0 ? Value(_toIntRequired(subject_assigns['id'])) : const Value.absent(),
-          sessionId: Value(subject_assigns['session_id'] as String),
-          classesId: Value(subject_assigns['classes_id'] as String),
-          sectionId: Value(subject_assigns['section_id'] as String),
-          status: Value(subject_assigns['status'] as String?),
-          createdAt: Value(subject_assigns['created_at'] as String?),
-          updatedAt: Value(subject_assigns['updated_at'] as String?),
+          sessionId: Value(_toStrRequired(subject_assigns['session_id'])),
+          classesId: Value(_toStrRequired(subject_assigns['classes_id'])),
+          sectionId: Value(_toStrRequired(subject_assigns['section_id'])),
+          status: Value(_toStr(subject_assigns['status'])),
+          createdAt: Value(_toStr(subject_assigns['created_at'])),
+          updatedAt: Value(_toStr(subject_assigns['updated_at'])),
         ),
       );
     } else {
@@ -638,15 +650,15 @@ class DatabaseHelper {
       await driftDb.into(driftDb.marksGrade).insertOnConflictUpdate(
         MarksGradeCompanion(
           id: _toInt(grades['id']) != null ? Value(_toIntRequired(grades['id'])) : const Value.absent(),
-          name: Value(grades['name'] as String),
+          name: Value(_toStrRequired(grades['name'])),
           percentFrom: Value(grades['percent_from'] as double),
           percentUpto: Value(grades['percent_upto'] as double),
           point: Value(_toIntRequired(grades['point'])),
-          remarks: Value(grades['remarks'] as String?),
+          remarks: Value(_toStr(grades['remarks'])),
           sessionId: Value(_toIntRequired(grades['session_id'])),
           status: Value(_toInt(grades['status']) ?? 1),
-          createdAt: Value(grades['created_at'] as String?),
-          updatedAt: Value(grades['updated_at'] as String?),
+          createdAt: Value(_toStr(grades['created_at'])),
+          updatedAt: Value(_toStr(grades['updated_at'])),
         ),
       );
     } else {
@@ -665,12 +677,12 @@ class DatabaseHelper {
       await driftDb.into(driftDb.subjectAssignChildrens).insertOnConflictUpdate(
         SubjectAssignChildrensCompanion(
           id: _toIntRequired(subject_assign_childrens['id']) != 0 ? Value(_toIntRequired(subject_assign_childrens['id'])) : const Value.absent(),
-          subjectAssignId: Value(subject_assign_childrens['subject_assign_id'] as String),
-          subjectId: Value(subject_assign_childrens['subject_id'] as String),
-          staffId: Value(subject_assign_childrens['staff_id'] as String),
-          status: Value(subject_assign_childrens['status'] as String?),
-          createdAt: Value(subject_assign_childrens['created_at'] as String?),
-          updatedAt: Value(subject_assign_childrens['updated_at'] as String?),
+          subjectAssignId: Value(_toStrRequired(subject_assign_childrens['subject_assign_id'])),
+          subjectId: Value(_toStrRequired(subject_assign_childrens['subject_id'])),
+          staffId: Value(_toStrRequired(subject_assign_childrens['staff_id'])),
+          status: Value(_toStr(subject_assign_childrens['status'])),
+          createdAt: Value(_toStr(subject_assign_childrens['created_at'])),
+          updatedAt: Value(_toStr(subject_assign_childrens['updated_at'])),
         ),
       );
     } else {
@@ -689,13 +701,13 @@ class DatabaseHelper {
       await driftDb.into(driftDb.bankAccounts).insertOnConflictUpdate(
         BankAccountsCompanion(
           id: _toIntRequired(bank_accounts['id']) != 0 ? Value(_toIntRequired(bank_accounts['id'])) : const Value.absent(),
-          bankName: Value(bank_accounts['bank_name'] as String),
-          accountName: Value(bank_accounts['account_name'] as String),
-          accountNumber: Value(bank_accounts['account_number'] as String),
-          accountType: Value(bank_accounts['account_type'] as String?),
-          status: Value(bank_accounts['status'] as String? ?? '1'),
-          createdAt: Value(bank_accounts['created_at'] as String?),
-          updatedAt: Value(bank_accounts['updated_at'] as String?),
+          bankName: Value(_toStrRequired(bank_accounts['bank_name'])),
+          accountName: Value(_toStrRequired(bank_accounts['account_name'])),
+          accountNumber: Value(_toStrRequired(bank_accounts['account_number'])),
+          accountType: Value(_toStr(bank_accounts['account_type'])),
+          status: Value(_toStr(bank_accounts['status']) ?? '1'),
+          createdAt: Value(_toStr(bank_accounts['created_at'])),
+          updatedAt: Value(_toStr(bank_accounts['updated_at'])),
         ),
       );
     } else {
@@ -715,21 +727,21 @@ class DatabaseHelper {
       await driftDb.into(driftDb.transactions).insertOnConflictUpdate(
         TransactionsCompanion(
           id: _toIntRequired(transactions['id']) != 0 ? Value(_toIntRequired(transactions['id'])) : const Value.absent(),
-          date: Value(transactions['date'] as String?),
+          date: Value(_toStr(transactions['date'])),
           paymentMethod: Value(_toInt(transactions['payment_method'])),
-          paymentGateway: Value(transactions['payment_gateway'] as String?),
-          transactionId: Value(transactions['transaction_id'] as String?),
+          paymentGateway: Value(_toStr(transactions['payment_gateway'])),
+          transactionId: Value(_toStr(transactions['transaction_id'])),
           feesAssignChildrenId: Value(_toInt(transactions['fees_assign_children_id'])),
           feesCollectBy: Value(_toInt(transactions['fees_collect_by'])),
           studentId: Value(_toInt(transactions['student_id'])),
           sessionId: Value(_toInt(transactions['session_id'])),
-          amount: Value(transactions['amount'] as String?),
-          fineAmount: Value(transactions['fine_amount'] as String?),
+          amount: Value(_toStr(transactions['amount'])),
+          fineAmount: Value(_toStr(transactions['fine_amount'])),
           accountId: Value(_toInt(transactions['account_id'])),
-          comments: Value(transactions['comments'] as String?),
+          comments: Value(_toStr(transactions['comments'])),
           printed: Value(_toInt(transactions['printed'])),
-          createdAt: Value(transactions['created_at'] as String?),
-          updatedAt: Value(transactions['updated_at'] as String?),
+          createdAt: Value(_toStr(transactions['created_at'])),
+          updatedAt: Value(_toStr(transactions['updated_at'])),
         ),
       );
     } else {
@@ -751,14 +763,14 @@ class DatabaseHelper {
           sessionId: Value(_toInt(fee['session_id'])),
           feesGroupId: Value(_toInt(fee['fees_group_id'])),
           feesTypeId: Value(_toInt(fee['fees_type_id'])),
-          dueDate: Value(fee['due_date'] as String?),
-          amount: Value(fee['amount'] as String?),
+          dueDate: Value(_toStr(fee['due_date'])),
+          amount: Value(_toStr(fee['amount'])),
           fineType: Value(_toInt(fee['fine_type'])),
           percentage: Value(_toInt(fee['percentage'])),
-          fineAmount: Value(fee['fine_amount'] as String?),
+          fineAmount: Value(_toStr(fee['fine_amount'])),
           status: Value(_toInt(fee['status'])),
-          createdAt: Value(fee['created_at'] as String?),
-          updatedAt: Value(fee['updated_at'] as String?),
+          createdAt: Value(_toStr(fee['created_at'])),
+          updatedAt: Value(_toStr(fee['updated_at'])),
         ),
       );
     } else {
@@ -777,13 +789,13 @@ class DatabaseHelper {
       await driftDb.into(driftDb.feesType).insertOnConflictUpdate(
         FeesTypeCompanion(
           id: _toIntRequired(fee['id']) != 0 ? Value(_toIntRequired(fee['id'])) : const Value.absent(),
-          name: Value(fee['name'] as String?),
-          code: Value(fee['code'] as String?),
-          description: Value(fee['description'] as String?),
+          name: Value(_toStr(fee['name'])),
+          code: Value(_toStr(fee['code'])),
+          description: Value(_toStr(fee['description'])),
           status: Value(_toInt(fee['status'])),
           classId: Value(_toInt(fee['class_id'])),
-          createdAt: Value(fee['created_at'] as String?),
-          updatedAt: Value(fee['updated_at'] as String?),
+          createdAt: Value(_toStr(fee['created_at'])),
+          updatedAt: Value(_toStr(fee['updated_at'])),
         ),
       );
     } else {
@@ -802,13 +814,13 @@ class DatabaseHelper {
       await driftDb.into(driftDb.feesGroups).insertOnConflictUpdate(
         FeesGroupsCompanion(
           id: _toIntRequired(fee['id']) != 0 ? Value(_toIntRequired(fee['id'])) : const Value.absent(),
-          name: Value(fee['name'] as String?),
-          dashboardOrder: Value(fee['dashboard_order'] as String?),
-          description: Value(fee['description'] as String?),
+          name: Value(_toStr(fee['name'])),
+          dashboardOrder: Value(_toStr(fee['dashboard_order'])),
+          description: Value(_toStr(fee['description'])),
           status: Value(_toInt(fee['status'])),
           onlineAdmissionFees: Value(_toInt(fee['online_admission_fees'])),
-          createdAt: Value(fee['created_at'] as String?),
-          updatedAt: Value(fee['updated_at'] as String?),
+          createdAt: Value(_toStr(fee['created_at'])),
+          updatedAt: Value(_toStr(fee['updated_at'])),
         ),
       );
     } else {
@@ -828,10 +840,10 @@ class DatabaseHelper {
         id: _toInt(data['id']) != null ? Value(_toIntRequired(data['id'])) : const Value.absent(),
         marksRegisterId: Value(_toIntRequired(data['marks_register_id'])),
         studentId: Value(_toIntRequired(data['student_id'])),
-        title: Value(data['title'] as String),
+        title: Value(_toStrRequired(data['title'])),
         mark: Value(_toIntRequired(data['mark'])),
-        createdAt: Value(data['created_at'] as String? ?? ''),
-        updatedAt: Value(data['updated_at'] as String? ?? ''),
+        createdAt: Value(_toStr(data['created_at']) ?? ''),
+        updatedAt: Value(_toStr(data['updated_at']) ?? ''),
       );
       await driftDb.into(driftDb.marksRegisterChildrens).insertOnConflictUpdate(companion);
       return _toIntRequired(data['id']);
@@ -863,10 +875,10 @@ class DatabaseHelper {
         id: _toInt(data['id']) != null ? Value(_toIntRequired(data['id'])) : const Value.absent(),
         marksRegisterId: Value(_toIntRequired(data['marks_register_id'])),
         studentId: Value(_toIntRequired(data['student_id'])),
-        title: Value(data['title'] as String),
+        title: Value(_toStrRequired(data['title'])),
         mark: Value(_toIntRequired(data['mark'])),
-        createdAt: Value(data['created_at'] as String?),
-        updatedAt: Value(data['updated_at'] as String?),
+        createdAt: Value(_toStr(data['created_at'])),
+        updatedAt: Value(_toStr(data['updated_at'])),
       );
       await driftDb.into(driftDb.marksRegisterChildrens).insertOnConflictUpdate(companion);
       return _toIntRequired(data['id']);
@@ -998,14 +1010,14 @@ class DatabaseHelper {
       await driftDb.into(driftDb.sections).insertOnConflictUpdate(
         SectionsCompanion(
           id: _toIntRequired(section['id']) != 0 ? Value(_toIntRequired(section['id'])) : const Value.absent(),
-          name: Value(section['name'] as String),
+          name: Value(_toStrRequired(section['name'])),
           status: Value(_toIntRequired(section['status'])),
-          createdAt: Value(section['created_at'] as String),
-          updatedAt: Value(section['updated_at'] as String),
-          sectionTran: Value(section['section_tran'] as String),
+          createdAt: Value(_toStrRequired(section['created_at'])),
+          updatedAt: Value(_toStrRequired(section['updated_at'])),
+          sectionTran: Value(_toStrRequired(section['section_tran'])),
         ),
       );
-      return section['id'] as int;
+      return _toIntRequired(section['id']);
     } else {
       final db = await DatabaseHelper.instance.database as Database;
       return await db.insert('sections', section, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -1031,15 +1043,15 @@ class DatabaseHelper {
       await driftDb.into(driftDb.subjects).insertOnConflictUpdate(
         SubjectsCompanion(
           id: _toIntRequired(subject['id']) != 0 ? Value(_toIntRequired(subject['id'])) : const Value.absent(),
-          name: Value(subject['name'] as String),
-          code: Value(subject['code'] as String?),
+          name: Value(_toStrRequired(subject['name'])),
+          code: Value(_toStr(subject['code'])),
           type: Value(_toIntRequired(subject['type'])),
           status: Value(_toIntRequired(subject['status'])),
-          createdAt: Value(subject['created_at'] as String),
-          updatedAt: Value(subject['updated_at'] as String),
+          createdAt: Value(_toStrRequired(subject['created_at'])),
+          updatedAt: Value(_toStrRequired(subject['updated_at'])),
         ),
       );
-      return subject['id'] as int;
+      return _toIntRequired(subject['id']);
     } else {
       final db = await DatabaseHelper.instance.database as Database;
       return await db.insert('subjects', subject, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -1146,7 +1158,7 @@ class DatabaseHelper {
         limit: 1,
       );
       if (results.isNotEmpty) {
-        return results.first['name'] as String;
+        return _toStrRequired(results.first['name']);
       }
       return 'No Grade';
     }
@@ -1225,12 +1237,12 @@ class DatabaseHelper {
       await driftDb.into(driftDb.classes).insertOnConflictUpdate(
         ClassesCompanion(
           id: _toIntRequired(data['id']) != 0 ? Value(_toIntRequired(data['id'])) : const Value.absent(),
-          name: Value(data['name'] as String),
+          name: Value(_toStrRequired(data['name'])),
           status: Value(_toIntRequired(data['status'])),
           orders: Value(_toIntRequired(data['orders'])),
-          createdAt: Value(data['created_at'] as String),
-          updatedAt: Value(data['updated_at'] as String),
-          classTran: Value(data['class_tran'] as String),
+          createdAt: Value(_toStrRequired(data['created_at'])),
+          updatedAt: Value(_toStrRequired(data['updated_at'])),
+          classTran: Value(_toStrRequired(data['class_tran'])),
         ),
       );
       return _toIntRequired(data['id']);
@@ -1260,11 +1272,11 @@ class DatabaseHelper {
       await driftDb.into(driftDb.examTypes).insertOnConflictUpdate(
         ExamTypesCompanion(
           id: _toIntRequired(examTypes['id']) != 0 ? Value(_toIntRequired(examTypes['id'])) : const Value.absent(),
-          name: Value(examTypes['name'] as String?),
-          type: Value(examTypes['type'] as String?),
+          name: Value(_toStr(examTypes['name'])),
+          type: Value(_toStr(examTypes['type'])),
           status: Value(_toInt(examTypes['status'])),
-          createdAt: Value(examTypes['created_at'] as String?),
-          updatedAt: Value(examTypes['updated_at'] as String?),
+          createdAt: Value(_toStr(examTypes['created_at'])),
+          updatedAt: Value(_toStr(examTypes['updated_at'])),
         ),
       );
       return _toIntRequired(examTypes['id']);
@@ -1293,12 +1305,12 @@ class DatabaseHelper {
       await driftDb.into(driftDb.users).insertOnConflictUpdate(
         UsersCompanion(
           id: user['id'] != null && user['id'].toString().isNotEmpty ? Value(_toIntRequired(user['id'])) : const Value.absent(),
-          name: Value(user['name'] as String),
-          phone: Value(user['phone'] as String?),
-          email: Value(user['email'] as String?),
-          password: Value(user['password'] as String),
-          status: Value(user['status'] as String),
-          roleId: Value(user['role_id'] as String?),
+          name: Value(_toStrRequired(user['name'])),
+          phone: Value(_toStr(user['phone'])),
+          email: Value(_toStr(user['email'])),
+          password: Value(_toStrRequired(user['password'])),
+          status: Value(_toStrRequired(user['status'])),
+          roleId: Value(_toStr(user['role_id'])),
         ),
       );
       return _toIntRequired(user['id']);
@@ -1615,14 +1627,14 @@ class DatabaseHelper {
         await driftDb.into(driftDb.students).insertOnConflictUpdate(
           StudentsCompanion(
             id: student['id'] != null && student['id'].toString().isNotEmpty ? Value(_toIntRequired(student['id'])) : const Value.absent(),
-            admissionNo: Value(student['admission_no'] as String?),
-            rollNo: Value(student['roll_no'] as String?),
-            firstName: Value(student['first_name'] as String?),
-            lastName: Value(student['last_name'] as String?),
-            mobile: Value(student['mobile'] as String?),
-            email: Value(student['email'] as String?),
-            dob: Value(student['dob'] as String?),
-            admissionDate: Value(student['admission_date'] as String?),
+            admissionNo: Value(_toStr(student['admission_no'])),
+            rollNo: Value(_toStr(student['roll_no'])),
+            firstName: Value(_toStr(student['first_name'])),
+            lastName: Value(_toStr(student['last_name'])),
+            mobile: Value(_toStr(student['mobile'])),
+            email: Value(_toStr(student['email'])),
+            dob: Value(_toStr(student['dob'])),
+            admissionDate: Value(_toStr(student['admission_date'])),
             studentCategoryId: Value(_toInt(student['student_category_id'])),
             religionId: Value(_toInt(student['religion_id'])),
             bloodGroupId: Value(_toInt(student['blood_group_id'])),
@@ -1631,23 +1643,23 @@ class DatabaseHelper {
             imageId: Value(_toInt(student['image_id'])),
             parentGuardianId: Value(_toInt(student['parent_guardian_id'])),
             userId: Value(_toInt(student['user_id'])),
-            uploadDocuments: Value(student['upload_documents'] as String?),
+            uploadDocuments: Value(_toStr(student['upload_documents'])),
             status: Value(_toInt(student['status'])),
             previousSchool: Value(_toInt(student['previous_school'])),
-            previousSchoolInfo: Value(student['previous_school_info'] as String?),
+            previousSchoolInfo: Value(_toStr(student['previous_school_info'])),
             previousSchoolImageId: Value(_toInt(student['previous_school_image_id'])),
-            placeOfBirth: Value(student['place_of_birth'] as String?),
-            nationality: Value(student['nationality'] as String?),
-            cprNo: Value(student['cpr_no'] as String?),
-            spokenLangAtHome: Value(student['spoken_lang_at_home'] as String?),
-            residanceAddress: Value(student['residance_address'] as String?),
-            controlNumber: Value(student['control_number'] as String?),
-            createdAt: Value(student['created_at'] as String?),
-            updatedAt: Value(student['updated_at'] as String?),
-            fullName: Value(student['full_name'] as String?),
-            className: Value(student['class_name'] as String?),
-            sectionName: Value(student['section_name'] as String?),
-            available: Value(student['available'] as String?),
+            placeOfBirth: Value(_toStr(student['place_of_birth'])),
+            nationality: Value(_toStr(student['nationality'])),
+            cprNo: Value(_toStr(student['cpr_no'])),
+            spokenLangAtHome: Value(_toStr(student['spoken_lang_at_home'])),
+            residanceAddress: Value(_toStr(student['residance_address'])),
+            controlNumber: Value(_toStr(student['control_number'])),
+            createdAt: Value(_toStr(student['created_at'])),
+            updatedAt: Value(_toStr(student['updated_at'])),
+            fullName: Value(_toStr(student['full_name'])),
+            className: Value(_toStr(student['class_name'])),
+            sectionName: Value(_toStr(student['section_name'])),
+            available: Value(_toStr(student['available'])),
           ),
         );
         return _toIntRequired(student['id']);
@@ -1673,25 +1685,25 @@ class DatabaseHelper {
         ParentDetailsCompanion(
           id: _toInt(parent['id']) != null ? Value(_toIntRequired(parent['id'])) : const Value.absent(),
           userId: Value(_toIntRequired(parent['user_id'])),
-          fatherName: Value(parent['father_name'] as String?),
-          fatherMobile: Value(parent['father_mobile'] as String?),
-          fatherProfession: Value(parent['father_profession'] as String?),
-          fatherImage: Value(parent['father_image'] as String?),
-          fatherNationality: Value(parent['father_nationality'] as String?),
-          motherName: Value(parent['mother_name'] as String?),
-          motherMobile: Value(parent['mother_mobile'] as String?),
-          motherProfession: Value(parent['mother_profession'] as String?),
-          motherImage: Value(parent['mother_image'] as String?),
-          guardianName: Value(parent['guardian_name'] as String?),
-          guardianEmail: Value(parent['guardian_email'] as String?),
-          guardianMobile: Value(parent['guardian_mobile'] as String?),
-          guardianImage: Value(parent['guardian_image'] as String?),
-          guardianProfession: Value(parent['guardian_profession'] as String?),
-          guardianRelation: Value(parent['guardian_relation'] as String?),
-          guardianAddress: Value(parent['guardian_address'] as String?),
+          fatherName: Value(_toStr(parent['father_name'])),
+          fatherMobile: Value(_toStr(parent['father_mobile'])),
+          fatherProfession: Value(_toStr(parent['father_profession'])),
+          fatherImage: Value(_toStr(parent['father_image'])),
+          fatherNationality: Value(_toStr(parent['father_nationality'])),
+          motherName: Value(_toStr(parent['mother_name'])),
+          motherMobile: Value(_toStr(parent['mother_mobile'])),
+          motherProfession: Value(_toStr(parent['mother_profession'])),
+          motherImage: Value(_toStr(parent['mother_image'])),
+          guardianName: Value(_toStr(parent['guardian_name'])),
+          guardianEmail: Value(_toStr(parent['guardian_email'])),
+          guardianMobile: Value(_toStr(parent['guardian_mobile'])),
+          guardianImage: Value(_toStr(parent['guardian_image'])),
+          guardianProfession: Value(_toStr(parent['guardian_profession'])),
+          guardianRelation: Value(_toStr(parent['guardian_relation'])),
+          guardianAddress: Value(_toStr(parent['guardian_address'])),
           status: Value(_toInt(parent['status']) ?? 1),
-          createdAt: Value(parent['created_at'] as String?),
-          updatedAt: Value(parent['updated_at'] as String?),
+          createdAt: Value(_toStr(parent['created_at'])),
+          updatedAt: Value(_toStr(parent['updated_at'])),
         ),
       );
       return _toIntRequired(parent['id']);
@@ -1716,21 +1728,21 @@ class DatabaseHelper {
           feesAssignId: Value(_toIntRequired(data['fees_assign_id'])),
           feesMasterId: Value(_toIntRequired(data['fees_master_id'])),
           studentId: Value(_toIntRequired(data['student_id'])),
-          controlNumber: Value(data['control_number'] as String),
-          feesAmount: Value(data['fees_amount'] as String? ?? '0'),
-          paidAmount: Value(data['paid_amount'] as String? ?? '0'),
-          remainedAmount: Value(data['remained_amount'] as String? ?? '0'),
-          quaterAmount: Value(data['quater_amount'] as String?),
+          controlNumber: Value(_toStrRequired(data['control_number'])),
+          feesAmount: Value(_toStr(data['fees_amount']) ?? '0'),
+          paidAmount: Value(_toStr(data['paid_amount']) ?? '0'),
+          remainedAmount: Value(_toStr(data['remained_amount']) ?? '0'),
+          quaterAmount: Value(_toStr(data['quater_amount'])),
           quaterOne: Value(_toInt(data['quater_one'])),
           quaterTwo: Value(_toInt(data['quater_two'])),
           quaterThree: Value(_toInt(data['quater_three'])),
           quaterFour: Value(_toInt(data['quater_four'])),
-          comment: Value(data['comment'] as String?),
-          outstandingbalance: Value(data['outstandingbalance'] as String?),
-          feeGroup: Value(data['fee_group'] as String?),
-          updated: Value(data['updated'] as String?),
-          createdAt: Value(data['created_at'] as String?),
-          updatedAt: Value(data['updated_at'] as String?),
+          comment: Value(_toStr(data['comment'])),
+          outstandingbalance: Value(_toStr(data['outstandingbalance'])),
+          feeGroup: Value(_toStr(data['fee_group'])),
+          updated: Value(_toStr(data['updated'])),
+          createdAt: Value(_toStr(data['created_at'])),
+          updatedAt: Value(_toStr(data['updated_at'])),
         ),
       );
       return _toIntRequired(data['id']);
@@ -1759,21 +1771,21 @@ class DatabaseHelper {
           feesAssignId: Value(_toIntRequired(data['fees_assign_id'])),
           feesMasterId: Value(_toIntRequired(data['fees_master_id'])),
           studentId: Value(_toIntRequired(data['student_id'])),
-          controlNumber: Value(data['control_number'] as String),
-          feesAmount: Value(data['fees_amount'] as String? ?? '0'),
-          paidAmount: Value(data['paid_amount'] as String? ?? '0'),
-          remainedAmount: Value(data['remained_amount'] as String? ?? '0'),
-          quaterAmount: Value(data['quater_amount'] as String?),
+          controlNumber: Value(_toStrRequired(data['control_number'])),
+          feesAmount: Value(_toStr(data['fees_amount']) ?? '0'),
+          paidAmount: Value(_toStr(data['paid_amount']) ?? '0'),
+          remainedAmount: Value(_toStr(data['remained_amount']) ?? '0'),
+          quaterAmount: Value(_toStr(data['quater_amount'])),
           quaterOne: Value(_toInt(data['quater_one'])),
           quaterTwo: Value(_toInt(data['quater_two'])),
           quaterThree: Value(_toInt(data['quater_three'])),
           quaterFour: Value(_toInt(data['quater_four'])),
-          comment: Value(data['comment'] as String?),
-          outstandingbalance: Value(data['outstandingbalance'] as String?),
-          feeGroup: Value(data['fee_group'] as String?),
-          updated: Value(data['updated'] as String?),
-          createdAt: Value(data['created_at'] as String?),
-          updatedAt: Value(data['updated_at'] as String?),
+          comment: Value(_toStr(data['comment'])),
+          outstandingbalance: Value(_toStr(data['outstandingbalance'])),
+          feeGroup: Value(_toStr(data['fee_group'])),
+          updated: Value(_toStr(data['updated'])),
+          createdAt: Value(_toStr(data['created_at'])),
+          updatedAt: Value(_toStr(data['updated_at'])),
         ),
       );
       return _toIntRequired(data['id']);
@@ -2120,7 +2132,7 @@ class DatabaseHelper {
         whereArgs: [studentId],
       );
       if (results.isNotEmpty) {
-        return results.first['control_number'] as String?;
+        return _toStr(results.first['control_number']);
       }
       return null;
     }

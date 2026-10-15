@@ -101,11 +101,24 @@ class _SplashScreenState extends State< SplashScreen> {
   Future<void> _storeDataLocally(Map<String, dynamic> data) async {
     final db = DatabaseHelper.instance;
 
-    for (var item in data['notice']) await db.insertNotice(item);
-    for (var item in data['examTypes']) await db.insertExamTypes(item);
-    for (var item in data['classes']) await db.insertClasses(item);
-    for (var item in data['sections']) await db.insertSection(item);
-    for (var item in data['subjects']) await db.insertSubject(item);
+    // One malformed row must not block startup; log it and keep going.
+    Future<void> each(String key, Future<dynamic> Function(Map<String, dynamic>) insert) async {
+      final items = data[key];
+      if (items is! List) return;
+      for (final item in items) {
+        try {
+          await insert(Map<String, dynamic>.from(item as Map));
+        } catch (e) {
+          debugPrint('Splash: failed to store $key row: $e');
+        }
+      }
+    }
+
+    await each('notice', db.insertNotice);
+    await each('examTypes', db.insertExamTypes);
+    await each('classes', db.insertClasses);
+    await each('sections', db.insertSection);
+    await each('subjects', db.insertSubject);
     // for (var item in data['marks_registers']) {
     //   await db.insertExam(
     //     sectionId: item['section_id'].toString(),
@@ -119,10 +132,10 @@ class _SplashScreenState extends State< SplashScreen> {
     // for (var item in data['marks_register_childrens']) {
     //   await db.insertMarksRegisterChildrenFromLogin(item);
     // }
-    for (var item in data['fees_masters']) await db.insertFee(item);
-    for (var item in data['fees_type']) await db.insertFeeType(item);
-    for (var item in data['fees_group']) await db.insertFeeGroup(item);
-    for (var item in data['bank_accounts']) await db.insertBankAccounts(item);
+    await each('fees_masters', db.insertFee);
+    await each('fees_type', db.insertFeeType);
+    await each('fees_group', db.insertFeeGroup);
+    await each('bank_accounts', db.insertBankAccounts);
     // for (var item in data['subject_assign_childrens']) await db.insertSubjectAssignChildren(item);
     // for (var item in data['subject_assigns']) await db.insertSubjectAssign(item);
     // for (var item in data['grades']) await db.insertGrades(item);

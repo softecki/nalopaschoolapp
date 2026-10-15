@@ -5,6 +5,6 @@ import 'package:drift/web.dart';
 QueryExecutor createPlatformConnection() {
   // WebDatabase uses SQL.js under the hood
   // Make sure sql-wasm.js is loaded in index.html
-  return WebDatabase('margaret_db', logStatements: true);
+  return WebDatabase('margaret_db');
 }
 
