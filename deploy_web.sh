@@ -34,6 +34,26 @@ flutter build web --release --no-tree-shake-icons
 
 if [ $? -eq 0 ]; then
     echo "✅ Build successful!"
+
+    # Drift (sql.js) and PWA files must ship with every deploy, or the app fails with
+    # "Could not access the sql.js javascript library".
+    REQUIRED_FILES="index.html main.dart.js flutter.js flutter_bootstrap.js manifest.json favicon.png sql-wasm.js sql-wasm.wasm sqlite3.wasm .htaccess icons/Icon-192.png icons/Icon-512.png icons/Icon-maskable-192.png icons/Icon-maskable-512.png icons/apple-touch-icon.png"
+    for f in $REQUIRED_FILES; do
+        if [ ! -f "build/web/$f" ] && [ -f "web/$f" ]; then
+            echo "⚠️  build/web/$f missing - copying from web/"
+            mkdir -p "build/web/$(dirname "$f")"
+            cp "web/$f" "build/web/$f"
+        fi
+    done
+    MISSING=""
+    for f in $REQUIRED_FILES; do
+        [ -f "build/web/$f" ] || MISSING="$MISSING $f"
+    done
+    if [ -n "$MISSING" ]; then
+        echo "❌ Build output is missing required files:$MISSING"
+        exit 1
+    fi
+    echo "✅ Database (sql.js) and PWA files present"
     
     # Create deployment package with timestamp
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -43,7 +63,7 @@ if [ $? -eq 0 ]; then
     
     # Copy build files
     mkdir -p "$DEPLOY_DIR"
-    cp -r build/web/* "$DEPLOY_DIR/"
+    cp -r build/web/. "$DEPLOY_DIR/"
     
     # Create deployment info file
     cat > "$DEPLOY_DIR/deployment_info.txt" << EOF
