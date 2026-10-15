@@ -20,7 +20,6 @@ import 'exam_result_screen.dart';
 import 'fee_payment_screen.dart';
 import 'library_screen.dart';
 import 'login_screen.dart';
-import 'package:intl/intl.dart';
 import 'make_payment_screen.dart';
 import 'qr_code_scanner_screen.dart';
 
@@ -269,8 +268,8 @@ class DashboardScreen extends StatelessWidget {
                         child: Icon(Icons.person, size: 40, color: AppColor.primaryColor),
                       ),
                       SizedBox(height: 10),
-                      Text(firstUser != null ? firstUser['full_name'] : 'User Name', style: TextStyle(color: Colors.white, fontSize: 18)),
-                      Text( firstUser != null ? firstUser['email'] :'user@example.com', style: TextStyle(color: Colors.white70,fontSize: 14)),
+                      Text(firstUser != null ? (firstUser['full_name']?.toString() ?? '') : 'User Name', style: TextStyle(color: Colors.white, fontSize: 18)),
+                      Text( firstUser != null ? (firstUser['email']?.toString() ?? '') :'user@example.com', style: TextStyle(color: Colors.white70,fontSize: 14)),
                     ],
                   ),
                 ),
@@ -633,7 +632,7 @@ class _StudentCardWidgetState extends State<StudentCardWidget> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      selectedStudent['full_name'] ?? 'Student Name',
+                      selectedStudent['full_name']?.toString() ?? 'Student Name',
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
                         color: Colors.white,
                         fontSize: 13,
@@ -651,7 +650,7 @@ class _StudentCardWidgetState extends State<StudentCardWidget> {
                     widget.roleId != '7'
                         ? const SizedBox(height: 4)
                         : Text(
-                      "Remained : TZS ${NumberFormat('#,##0').format(double.parse(selectedStudent['remained_amount'].toString()))}",
+                      "Remained : TZS ${DatabaseHelper.formatAmount(selectedStudent['remained_amount'])}",
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Colors.white,
                       ),
@@ -689,7 +688,7 @@ class _StudentCardWidgetState extends State<StudentCardWidget> {
                   return DropdownMenuItem<Map<String, dynamic>>(
                     value: student,
                     child: Text(
-                      student['first_name'],
+                      student['first_name']?.toString() ?? '',
                       style: const TextStyle(fontSize: 12),
                     ),
                   );

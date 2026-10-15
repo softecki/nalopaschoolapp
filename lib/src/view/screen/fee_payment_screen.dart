@@ -1,6 +1,5 @@
 import 'package:dodomaapp/src/view/screen/payment_receipt_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/app_color.dart';
@@ -102,11 +101,11 @@ class FeePaymentHistory extends State<FeePaymentHistoryScreen> with SingleTicker
                   ),
                   SizedBox(height: 10),
                   Text(
-                    firstStudent != null ? firstStudent!['full_name'] : "Loading...",
+                    firstStudent != null ? (firstStudent!['full_name']?.toString() ?? '') : "Loading...",
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                   Text(
-                    firstStudent != null ? firstStudent!['class_name'] : "Loading...",
+                    firstStudent != null ? (firstStudent!['class_name']?.toString() ?? '') : "Loading...",
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
@@ -156,14 +155,14 @@ class FeePaymentHistory extends State<FeePaymentHistoryScreen> with SingleTicker
 
         return PaymentCard(
           title: paymentTitle,
-          date: transaction?["created_at"],
-          amount: transaction?["amount"],
+          date: transaction?["created_at"]?.toString() ?? '',
+          amount: 'TZS ${DatabaseHelper.formatAmount(transaction?["amount"])}',
           status: 'Paid',
           color: Colors.green,
           icon: Icons.check_circle,
-          transaction_id: transaction?["transaction_id"],
-          full_name: transaction?["full_name"],
-          account_number: transaction?["account_number"],
+          transaction_id: transaction?["transaction_id"]?.toString() ?? '',
+          full_name: transaction?["full_name"]?.toString() ?? '',
+          account_number: transaction?["account_number"]?.toString() ?? '',
         );
       },
     )
@@ -219,10 +218,10 @@ class FeePaymentHistory extends State<FeePaymentHistoryScreen> with SingleTicker
             final fee = fees?[index];
             return _infoTile(
                     icon: Icons.person,
-                    title: fee?['fee_name'].toString() ?? 'Loading...',
-                    subtitle: '${fee?['fees_amount']}',
-                    paid_amount:'${fee?['paid_amount']}',
-                    remained_amount:'${fee?['remained_amount']}'
+                    title: fee?['fee_name']?.toString() ?? 'Loading...',
+                    subtitle: DatabaseHelper.formatAmount(fee?['fees_amount']),
+                    paid_amount: DatabaseHelper.formatAmount(fee?['paid_amount']),
+                    remained_amount: DatabaseHelper.formatAmount(fee?['remained_amount'])
                   );
 
           },
@@ -284,24 +283,21 @@ class FeePaymentHistory extends State<FeePaymentHistoryScreen> with SingleTicker
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Total Amount'),
-              Text('TZS ' +
-                  NumberFormat('#,###').format(
-                    double.tryParse(subtitle ?? '0') ?? 0,
-                  ),style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold))
+              Text('TZS $subtitle', style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold))
             ],
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Paid Amount'),
-              Text('TZS '+NumberFormat('#,###').format(double.tryParse(paid_amount??'0')??0),style: TextStyle(color: Colors.green,fontWeight: FontWeight.bold),)
+              Text('TZS $paid_amount', style: TextStyle(color: Colors.green,fontWeight: FontWeight.bold),)
             ],
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Remained Amount'),
-              Text('TZS '+NumberFormat('#,###').format(double.tryParse(remained_amount??'0')??0),style: TextStyle(color: Colors.red,fontWeight: FontWeight.bold))
+              Text('TZS $remained_amount', style: TextStyle(color: Colors.red,fontWeight: FontWeight.bold))
             ],
           )
         ],

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Conditional imports for database
@@ -42,6 +43,50 @@ class DatabaseHelper {
 
   static String _toStrRequired(dynamic value, {String defaultValue = ''}) {
     return _toStr(value) ?? defaultValue;
+  }
+
+  /// Money from the API/DB may be int, double, "150000.00", "1,500" or null.
+  /// Amounts are always stored as a plain numeric string ("150000", "-2500", "1250.5").
+  static String? _toAmountOrNull(dynamic value) {
+    if (value == null) return null;
+    final parsed = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString().replaceAll(',', '').trim());
+    if (parsed == null || parsed.isNaN || parsed.isInfinite) return null;
+    return parsed == parsed.truncateToDouble() ? parsed.toInt().toString() : parsed.toString();
+  }
+
+  static String _toAmount(dynamic value) => _toAmountOrNull(value) ?? '0';
+
+  /// Safe numeric value of any stored/received amount, for calculations and display.
+  static double amountValue(dynamic value) => double.tryParse(_toAmount(value)) ?? 0;
+
+  /// Display format used across the app, e.g. "150,000".
+  static String formatAmount(dynamic value) => NumberFormat('#,##0').format(amountValue(value));
+
+  /// Fee row with every column coerced to the type of the local table (same for web and mobile).
+  static Map<String, dynamic> _feesRow(Map<String, dynamic> data) {
+    return {
+      if (_toInt(data['id']) != null) 'id': _toInt(data['id']),
+      'fees_assign_id': _toIntRequired(data['fees_assign_id']),
+      'fees_master_id': _toIntRequired(data['fees_master_id']),
+      'student_id': _toIntRequired(data['student_id']),
+      'control_number': _toStrRequired(data['control_number']),
+      'fees_amount': _toAmount(data['fees_amount']),
+      'paid_amount': _toAmount(data['paid_amount']),
+      'remained_amount': _toAmount(data['remained_amount']),
+      'quater_amount': _toAmountOrNull(data['quater_amount']),
+      'quater_one': _toInt(data['quater_one']),
+      'quater_two': _toInt(data['quater_two']),
+      'quater_three': _toInt(data['quater_three']),
+      'quater_four': _toInt(data['quater_four']),
+      'comment': _toStr(data['comment']),
+      'outstandingbalance': _toAmountOrNull(data['outstandingbalance']),
+      'fee_group': _toStr(data['fee_group']),
+      'updated': _toStr(data['updated']),
+      'created_at': _toStr(data['created_at']),
+      'updated_at': _toStr(data['updated_at']),
+    };
   }
 
   static int _toIntRequired(dynamic value, {int defaultValue = 0}) {
@@ -735,8 +780,8 @@ class DatabaseHelper {
           feesCollectBy: Value(_toInt(transactions['fees_collect_by'])),
           studentId: Value(_toInt(transactions['student_id'])),
           sessionId: Value(_toInt(transactions['session_id'])),
-          amount: Value(_toStr(transactions['amount'])),
-          fineAmount: Value(_toStr(transactions['fine_amount'])),
+          amount: Value(_toAmountOrNull(transactions['amount'])),
+          fineAmount: Value(_toAmountOrNull(transactions['fine_amount'])),
           accountId: Value(_toInt(transactions['account_id'])),
           comments: Value(_toStr(transactions['comments'])),
           printed: Value(_toInt(transactions['printed'])),
@@ -748,7 +793,12 @@ class DatabaseHelper {
       final db = await DatabaseHelper.instance.database as Database;
       await db.insert(
         'transactions',
-        transactions,
+        {
+          ...transactions,
+          'transaction_id': _toStr(transactions['transaction_id']),
+          'amount': _toAmountOrNull(transactions['amount']),
+          'fine_amount': _toAmountOrNull(transactions['fine_amount']),
+        },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
@@ -1714,89 +1764,85 @@ class DatabaseHelper {
   }
 
   Future<int> insertFeesAssignment(Map<String, dynamic> data) async {
+    final row = _feesRow(data);
+    final int? id = row['id'];
     if (kIsWeb) {
       final driftDb = _driftDatabase ??= AppDatabase();
-      // Delete existing if exists
-      if (data['id'] != null) {
+      if (id != null) {
         await (driftDb.delete(driftDb.feesAssignments)
-          ..where((f) => f.id.equals(_toIntRequired(data['id'])))).go();
+          ..where((f) => f.id.equals(id))).go();
       }
-      // Insert new
       await driftDb.into(driftDb.feesAssignments).insertOnConflictUpdate(
         FeesAssignmentsCompanion(
-          id: _toInt(data['id']) != null ? Value(_toIntRequired(data['id'])) : const Value.absent(),
-          feesAssignId: Value(_toIntRequired(data['fees_assign_id'])),
-          feesMasterId: Value(_toIntRequired(data['fees_master_id'])),
-          studentId: Value(_toIntRequired(data['student_id'])),
-          controlNumber: Value(_toStrRequired(data['control_number'])),
-          feesAmount: Value(_toStr(data['fees_amount']) ?? '0'),
-          paidAmount: Value(_toStr(data['paid_amount']) ?? '0'),
-          remainedAmount: Value(_toStr(data['remained_amount']) ?? '0'),
-          quaterAmount: Value(_toStr(data['quater_amount'])),
-          quaterOne: Value(_toInt(data['quater_one'])),
-          quaterTwo: Value(_toInt(data['quater_two'])),
-          quaterThree: Value(_toInt(data['quater_three'])),
-          quaterFour: Value(_toInt(data['quater_four'])),
-          comment: Value(_toStr(data['comment'])),
-          outstandingbalance: Value(_toStr(data['outstandingbalance'])),
-          feeGroup: Value(_toStr(data['fee_group'])),
-          updated: Value(_toStr(data['updated'])),
-          createdAt: Value(_toStr(data['created_at'])),
-          updatedAt: Value(_toStr(data['updated_at'])),
+          id: id != null ? Value(id) : const Value.absent(),
+          feesAssignId: Value(row['fees_assign_id']),
+          feesMasterId: Value(row['fees_master_id']),
+          studentId: Value(row['student_id']),
+          controlNumber: Value(row['control_number']),
+          feesAmount: Value(row['fees_amount']),
+          paidAmount: Value(row['paid_amount']),
+          remainedAmount: Value(row['remained_amount']),
+          quaterAmount: Value(row['quater_amount']),
+          quaterOne: Value(row['quater_one']),
+          quaterTwo: Value(row['quater_two']),
+          quaterThree: Value(row['quater_three']),
+          quaterFour: Value(row['quater_four']),
+          comment: Value(row['comment']),
+          outstandingbalance: Value(row['outstandingbalance']),
+          feeGroup: Value(row['fee_group']),
+          updated: Value(row['updated']),
+          createdAt: Value(row['created_at']),
+          updatedAt: Value(row['updated_at']),
         ),
       );
-      return _toIntRequired(data['id']);
+      return id ?? 0;
     } else {
       final db = await instance.database as Database;
-      await db.delete(
-        'fees_assignments',
-        where: 'id = ?',
-        whereArgs: [data['id']],
-      );
-      return await db.insert('fees_assignments', data);
+      if (id != null) {
+        await db.delete('fees_assignments', where: 'id = ?', whereArgs: [id]);
+      }
+      return await db.insert('fees_assignments', row, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
   Future<int> insertFeesAssignChildren(Map<String, dynamic> data) async {
+    final row = _feesRow(data);
+    final int? id = row['id'];
     if (kIsWeb) {
       final driftDb = _driftDatabase ??= AppDatabase();
-      // Delete existing if exists
-      if (data['id'] != null) {
+      if (id != null) {
         await (driftDb.delete(driftDb.feesAssignChildren)
-          ..where((f) => f.id.equals(_toIntRequired(data['id'])))).go();
+          ..where((f) => f.id.equals(id))).go();
       }
-      // Insert new
       await driftDb.into(driftDb.feesAssignChildren).insertOnConflictUpdate(
         FeesAssignChildrenCompanion(
-          id: _toInt(data['id']) != null ? Value(_toIntRequired(data['id'])) : const Value.absent(),
-          feesAssignId: Value(_toIntRequired(data['fees_assign_id'])),
-          feesMasterId: Value(_toIntRequired(data['fees_master_id'])),
-          studentId: Value(_toIntRequired(data['student_id'])),
-          controlNumber: Value(_toStrRequired(data['control_number'])),
-          feesAmount: Value(_toStr(data['fees_amount']) ?? '0'),
-          paidAmount: Value(_toStr(data['paid_amount']) ?? '0'),
-          remainedAmount: Value(_toStr(data['remained_amount']) ?? '0'),
-          quaterAmount: Value(_toStr(data['quater_amount'])),
-          quaterOne: Value(_toInt(data['quater_one'])),
-          quaterTwo: Value(_toInt(data['quater_two'])),
-          quaterThree: Value(_toInt(data['quater_three'])),
-          quaterFour: Value(_toInt(data['quater_four'])),
-          comment: Value(_toStr(data['comment'])),
-          outstandingbalance: Value(_toStr(data['outstandingbalance'])),
-          feeGroup: Value(_toStr(data['fee_group'])),
-          updated: Value(_toStr(data['updated'])),
-          createdAt: Value(_toStr(data['created_at'])),
-          updatedAt: Value(_toStr(data['updated_at'])),
+          id: id != null ? Value(id) : const Value.absent(),
+          feesAssignId: Value(row['fees_assign_id']),
+          feesMasterId: Value(row['fees_master_id']),
+          studentId: Value(row['student_id']),
+          controlNumber: Value(row['control_number']),
+          feesAmount: Value(row['fees_amount']),
+          paidAmount: Value(row['paid_amount']),
+          remainedAmount: Value(row['remained_amount']),
+          quaterAmount: Value(row['quater_amount']),
+          quaterOne: Value(row['quater_one']),
+          quaterTwo: Value(row['quater_two']),
+          quaterThree: Value(row['quater_three']),
+          quaterFour: Value(row['quater_four']),
+          comment: Value(row['comment']),
+          outstandingbalance: Value(row['outstandingbalance']),
+          feeGroup: Value(row['fee_group']),
+          updated: Value(row['updated']),
+          createdAt: Value(row['created_at']),
+          updatedAt: Value(row['updated_at']),
         ),
       );
-      return _toIntRequired(data['id']);
+      return id ?? 0;
     } else {
       final db = await instance.database as Database;
-      await db.delete(
-        'fees_assign_children',
-        where: 'id = ?',
-        whereArgs: [data['id']],
-      );
-      return await db.insert('fees_assign_children', data);
+      if (id != null) {
+        await db.delete('fees_assign_children', where: 'id = ?', whereArgs: [id]);
+      }
+      return await db.insert('fees_assign_children', row, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
@@ -1894,7 +1940,7 @@ class DatabaseHelper {
   Future<String> getTotalFees(String studentId) async {
     final summary = await getFeesSummary(studentId);
     if (summary != null && summary['balance_remaining'] != null) {
-      return summary['balance_remaining'].toString();
+      return _toAmount(summary['balance_remaining']);
     }
 
     final studentIdInt = int.tryParse(studentId) ?? 0;
@@ -1907,22 +1953,14 @@ class DatabaseHelper {
         readsFrom: {driftDb.feesAssignments},
       );
       final rows = await query.get();
-      final total = rows.isNotEmpty && rows.first.data['total'] != null
-          ? rows.first.data['total'].toString()
-          : "0.0";
-      print(total);
-      return total;
+      return _toAmount(rows.isNotEmpty ? rows.first.data['total'] : null);
     } else {
       final db = await instance.database as Database;
       List<Map<String, dynamic>> result = await db.rawQuery(
-        "SELECT SUM(remained_amount) as total FROM fees_assignments WHERE student_id = ?",
-        [studentId],
+        "SELECT SUM(CAST(remained_amount AS REAL)) as total FROM fees_assignments WHERE student_id = ?",
+        [studentIdInt],
       );
-      String total = result.first["total"] != null
-          ? result.first["total"].toString()
-          : "0.0";
-      print(total);
-      return total;
+      return _toAmount(result.isNotEmpty ? result.first["total"] : null);
     }
   }
   Future<Map<String, dynamic>?> getFeesDetails(int id) async {

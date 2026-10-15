@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -86,10 +85,10 @@ class _PaymentReceiptScreenState extends State<PaymentReceiptScreen> {
                             ),
                             SizedBox(height: 10),
                             // Show name as header, not as a detail
-                            if ((paymentDetails!["full_name"] ?? '').isNotEmpty) ...[
+                            if ((paymentDetails!["full_name"]?.toString() ?? '').isNotEmpty) ...[
                               Center(
                                 child: Text(
-                                  paymentDetails!["full_name"] ?? '',
+                                  paymentDetails!["full_name"]?.toString() ?? '',
                                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                 ),
                               ),
@@ -139,9 +138,9 @@ class _PaymentReceiptScreenState extends State<PaymentReceiptScreen> {
   // Redesign for paper style and download
   List<Widget> _buildReceiptRows(Map<String, dynamic> trx) {
     final rows = <Map<String, String>>[{
-      "Receipt No": trx["comments"] ?? '',
-      "Bank Account": trx["account_number"] ?? '',
-      "Amount Paid": "TZS " + (trx["amount"] != null ? NumberFormat('#,##0').format(double.tryParse(trx["amount"].toString()) ?? 0) : ''),
+      "Receipt No": trx["comments"]?.toString() ?? '',
+      "Bank Account": trx["account_number"]?.toString() ?? '',
+      "Amount Paid": "TZS ${DatabaseHelper.formatAmount(trx["amount"])}",
       // "Payment Method": trx["payment_gateway"]?.toString() ?? '',
       "Date Received": trx["date"]?.toString() ?? trx["created_at"]?.toString() ?? '',
       "Status": (trx["printed"] == 1) ? "Printed" : "Confirmed",
@@ -192,7 +191,7 @@ class _PaymentReceiptScreenState extends State<PaymentReceiptScreen> {
                 pw.SizedBox(height: 6),
                 pw.Center(child: pw.Text('Payment Receipt', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold))),
                 pw.SizedBox(height: 8),
-                pw.Text(paymentDetails!["full_name"] ?? '', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
+                pw.Text(paymentDetails!["full_name"]?.toString() ?? '', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
                 pw.SizedBox(height: 10),
                 ..._buildPdfRows(paymentDetails!),
                 pw.SizedBox(height: 15),
@@ -211,9 +210,9 @@ class _PaymentReceiptScreenState extends State<PaymentReceiptScreen> {
 
   List<pw.Widget> _buildPdfRows(Map<String, dynamic> trx) {
     final pdfRows = <Map<String, String>>[{
-      "Receipt No": trx["transaction_id"] ?? '',
-      "Bank Account": trx["account_number"] ?? '',
-      "Amount Paid": "TZS " + (trx["amount"] != null ? NumberFormat('#,##0').format(double.tryParse(trx["amount"].toString()) ?? 0) : ''),
+      "Receipt No": trx["transaction_id"]?.toString() ?? '',
+      "Bank Account": trx["account_number"]?.toString() ?? '',
+      "Amount Paid": "TZS ${DatabaseHelper.formatAmount(trx["amount"])}",
       // "Payment Method": trx["payment_gateway"]?.toString() ?? '',
       "Date Received": trx["date"]?.toString() ?? trx["created_at"]?.toString() ?? '',
       "Status": (trx["printed"] == 1) ? "Printed" : "Confirmed",

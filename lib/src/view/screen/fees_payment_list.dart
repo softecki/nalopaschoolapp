@@ -130,10 +130,10 @@ class Notice {
 
   factory Notice.fromMap(Map<String, dynamic> map) {
     return Notice(
-      title: map['first_name'] ?? '',
-      date: map['last_name'] ?? '',
-      description: map['fees_amount']?.toString() ?? '0',
-      remained: map['remained_amount']?.toString() ?? '0',
+      title: map['first_name']?.toString() ?? '',
+      date: map['last_name']?.toString() ?? '',
+      description: DatabaseHelper.formatAmount(map['fees_amount']),
+      remained: DatabaseHelper.formatAmount(map['remained_amount']),
     );
   }
 }
@@ -174,9 +174,9 @@ class PaymentCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Text("Fees:", style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(double.parse(description).round().toString()),
+            Text(description),
             Text("Remained:", style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(double.parse(remained).round().toString()),
+            Text(remained),
           ],
         ),
         isThreeLine: true,
