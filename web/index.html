@@ -39,8 +39,100 @@
   
   <!-- Drift Web Database Support (SQL.js required for Drift WebDatabase) -->
   <script src="sql-wasm.js"></script>
+
+  <style>
+    #pwa-install-banner {
+      position: fixed; top: 12px; left: 50%; z-index: 2147483647;
+      transform: translate(-50%, -150%); transition: transform .35s ease;
+      width: calc(100% - 24px); max-width: 480px; box-sizing: border-box;
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      background: #fff; border-left: 5px solid #ccbd00; border-radius: 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.18);
+      font-family: Roboto, "Segoe UI", Arial, sans-serif; color: #222;
+    }
+    #pwa-install-banner.show { transform: translate(-50%, 0); }
+    #pwa-install-banner img { width: 44px; height: 44px; border-radius: 10px; flex: none; }
+    #pwa-install-banner .pwa-text { flex: 1; min-width: 0; }
+    #pwa-install-banner .pwa-title { font-weight: 700; font-size: 15px; }
+    #pwa-install-banner .pwa-sub { font-size: 13px; color: #555; margin-top: 2px; line-height: 1.35; }
+    #pwa-install-banner button { font: inherit; cursor: pointer; border: 0; }
+    #pwa-install-banner .pwa-install {
+      background: #ccbd00; color: #fff; font-weight: 700; font-size: 14px;
+      padding: 8px 14px; border-radius: 8px; flex: none;
+    }
+    #pwa-install-banner .pwa-close {
+      background: transparent; color: #888; font-size: 22px; line-height: 1; padding: 0 4px; flex: none;
+    }
+  </style>
 </head>
 <body>
+  <div id="pwa-install-banner" role="dialog" aria-live="polite" aria-label="Install Nalopa School app">
+    <img src="icons/Icon-192.png" alt="Nalopa School">
+    <div class="pwa-text">
+      <div class="pwa-title">Install Nalopa School</div>
+      <div class="pwa-sub" id="pwa-install-sub">Add the app to your home screen for quick access to fees, payments and results.</div>
+    </div>
+    <button type="button" class="pwa-install" id="pwa-install-btn">Install</button>
+    <button type="button" class="pwa-close" id="pwa-install-close" aria-label="Close">&times;</button>
+  </div>
+
+  <script>
+    (function () {
+      var DISMISS_KEY = 'pwa_install_dismissed_at';
+      var DISMISS_DAYS = 3;
+      var banner = document.getElementById('pwa-install-banner');
+      var installBtn = document.getElementById('pwa-install-btn');
+      var closeBtn = document.getElementById('pwa-install-close');
+      var sub = document.getElementById('pwa-install-sub');
+      var deferredPrompt = null;
+
+      var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      var ua = window.navigator.userAgent;
+      var isIos = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var isIosSafari = isIos && /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua);
+
+      function recentlyDismissed() {
+        try {
+          var at = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
+          return at && (Date.now() - at) < DISMISS_DAYS * 86400000;
+        } catch (e) { return false; }
+      }
+      function show() {
+        if (isStandalone || recentlyDismissed()) return;
+        setTimeout(function () { banner.classList.add('show'); }, 2500);
+      }
+      function hide(remember) {
+        banner.classList.remove('show');
+        if (remember) { try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (e) {} }
+      }
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        show();
+      });
+
+      installBtn.addEventListener('click', function () {
+        if (!deferredPrompt) { hide(true); return; }
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function (choice) {
+          hide(choice.outcome !== 'accepted');
+          deferredPrompt = null;
+        });
+      });
+      closeBtn.addEventListener('click', function () { hide(true); });
+
+      window.addEventListener('appinstalled', function () { hide(false); deferredPrompt = null; });
+
+      // iOS Safari has no install prompt API, so explain the manual steps instead.
+      if (isIosSafari && !isStandalone) {
+        sub.innerHTML = 'Tap the <b>Share</b> button, then <b>Add to Home Screen</b>.';
+        installBtn.textContent = 'OK';
+        show();
+      }
+    })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
