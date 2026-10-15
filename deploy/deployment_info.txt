@@ -1,6 +1,6 @@
 Nalopa School App Web Deployment
 =================================
-Version: 1.3.0
-Deployed: Thu Oct 15 10:13:19 EAST 2026
-Build: 20261015_101318
+Version: 1.4.0
+Deployed: Thu Oct 15 10:32:52 EAST 2026
+Build: 20261015_103250
 Flutter Version: Flutter 3.47.7 • channel stable • https://github.com/flutter/flutter.git

@@ -64,6 +64,15 @@ if [ $? -eq 0 ]; then
     # Copy build files
     mkdir -p "$DEPLOY_DIR"
     cp -r build/web/. "$DEPLOY_DIR/"
+
+    # Cache busting: index.html is never cached, so versioned URLs force Cloudflare/browsers
+    # to fetch the new flutter_bootstrap.js and main.dart.js instead of serving stale copies.
+    sed -i "s#\"mainJsPath\":\"main.dart.js\"#\"mainJsPath\":\"main.dart.js?v=$TIMESTAMP\"#" "$DEPLOY_DIR/flutter_bootstrap.js"
+    sed -i "s#src=\"flutter_bootstrap.js\"#src=\"flutter_bootstrap.js?v=$TIMESTAMP\"#" "$DEPLOY_DIR/index.html"
+    if ! grep -q "main.dart.js?v=$TIMESTAMP" "$DEPLOY_DIR/flutter_bootstrap.js"; then
+        echo "❌ Could not version main.dart.js in flutter_bootstrap.js"
+        exit 1
+    fi
     
     # Create deployment info file
     cat > "$DEPLOY_DIR/deployment_info.txt" << EOF
