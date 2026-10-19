@@ -14,14 +14,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/app_data.dart';
 import '../../../generated/assets.dart';
 import '../../static.dart';
-import 'chart_screen.dart';
 import 'class_timetable_screen.dart';
 import 'exam_result_screen.dart';
 import 'fee_payment_screen.dart';
 import 'library_screen.dart';
 import 'login_screen.dart';
 import 'make_payment_screen.dart';
+import 'parent_attendance_screen.dart';
 import 'qr_code_scanner_screen.dart';
+import 'qr_scan_report_screen.dart';
 
 
 
@@ -30,6 +31,7 @@ import 'qr_code_scanner_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   late final String role_id;
+  List<String> appFeatures = [];
 
   Widget _neumorphicButton(String text, VoidCallback onTap) {
     return GestureDetector(
@@ -60,7 +62,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _recommendedProductListView(BuildContext context) {
+  Widget _recommendedProductListView(BuildContext context, bool showBalance) {
 
     return FutureBuilder<List<Map<String, dynamic>>?>(
       future: DatabaseHelper.instance.getStudentsWithDetails(),
@@ -88,6 +90,7 @@ class DashboardScreen extends StatelessWidget {
               return StudentCardWidget(
                 students: firstUser??[],
                 roleId: role_id,
+                showBalance: showBalance,
               );
 
             },
@@ -100,6 +103,10 @@ class DashboardScreen extends StatelessWidget {
   Future<Map<String, dynamic>?> _getFirstUser() async {
     final prefs =  await SharedPreferences.getInstance();
     role_id = prefs.getString('role')??'7';
+    final rawFeatures = prefs.getString('app_features');
+    if (rawFeatures != null && rawFeatures.isNotEmpty) {
+      appFeatures = List<String>.from(jsonDecode(rawFeatures));
+    }
     return await DatabaseHelper.instance.getFirstStudent();
   }
 
@@ -129,113 +136,30 @@ class DashboardScreen extends StatelessWidget {
         }
 
         final firstUser = snapshot.data;
-        List<Map<String, dynamic>> menuItems = [];
-        if(role_id=='5') {
-          menuItems = [
-            {'icon': Icons.person, 'label': 'Profile', 'color': Colors.blue},
-            {
-              'icon': Icons.payment,
-              'label': 'Fee Payment',
-              'color': Colors.deepPurple
-            },
-            {'icon': Icons.grade, 'label': 'Exam Result', 'color': Colors.pink},
-            {
-              'icon': Icons.assignment,
-              'label': 'Upload Result',
-              'color': Colors.yellow
-            },
-            {
-              'icon': Icons.receipt_long,
-              'label': 'Payment List',
-              'color': Colors.blue
-            },
-            {
-              'icon': Icons.check_circle,
-              'label': 'Attendance',
-              'color': Colors.orange
-            },
-            {
-              'icon': Icons.notifications,
-              'label': 'Notice',
-              'color': Colors.purple
-            },
-            {
-              'icon': Icons.calendar_today,
-              'label': 'Class Routine',
-              'color': Colors.green
-            },
-            {
-              'icon': Icons.email,
-              'label': 'Message',
-              'color': Colors.blueAccent
-            },
-            {
-              'icon': Icons.card_giftcard,
-              'label': 'Holiday',
-              'color': Colors.red
-            },
-            {
-              'icon': Icons.home_work,
-              'label': 'Homework',
-              'color': Colors.orange
-            },
-            {
-              'icon': Icons.library_books,
-              'label': 'Library',
-              'color': Colors.purple
-            },
-            {
-              'icon': Icons.qr_code_scanner,
-              'label': 'QR Scanner',
-              'color': Colors.teal
-            },
-          ];
-        }else{
-          menuItems = [
-            {'icon': Icons.person, 'label': 'Profile', 'color': Colors.blue},
-            {
-              'icon': Icons.payment,
-              'label': 'Fee Payment',
-              'color': Colors.deepPurple
-            },
-            {'icon': Icons.grade, 'label': 'Exam Result', 'color': Colors.pink},
-            {
-              'icon': Icons.notifications,
-              'label': 'Notice',
-              'color': Colors.purple
-            },
-            {
-              'icon': Icons.calendar_today,
-              'label': 'Class Routine',
-              'color': Colors.green
-            },
-            {
-              'icon': Icons.email,
-              'label': 'Message',
-              'color': Colors.blueAccent
-            },
-            {
-              'icon': Icons.card_giftcard,
-              'label': 'Holiday',
-              'color': Colors.red
-            },
-            {
-              'icon': Icons.home_work,
-              'label': 'Homework',
-              'color': Colors.orange
-            },
-            {
-              'icon': Icons.library_books,
-              'label': 'Library',
-              'color': Colors.purple
-            },
-            {
-              'icon': Icons.qr_code_scanner,
-              'label': 'QR Scanner',
-              'color': Colors.teal
-            },
-          ];
-        }
+        final allowed = appFeatures.toSet();
+        final catalog = <Map<String, dynamic>>[
+          {'icon': Icons.person, 'label': 'Profile', 'color': Colors.blue, 'feature': ''},
+          {'icon': Icons.payment, 'label': 'Fee Payment', 'color': Colors.deepPurple, 'feature': 'app_fee_payment'},
+          {'icon': Icons.grade, 'label': 'Exam Result', 'color': Colors.pink, 'feature': 'app_exam_result'},
+          {'icon': Icons.assignment, 'label': 'Upload Result', 'color': Colors.yellow, 'feature': 'app_upload_result'},
+          {'icon': Icons.receipt_long, 'label': 'Payment List', 'color': Colors.blue, 'feature': 'app_payment_list'},
+          {'icon': Icons.check_circle, 'label': 'Attendance', 'color': Colors.orange, 'feature': 'app_attendance'},
+          {'icon': Icons.fact_check, 'label': 'Attendance Report', 'color': Colors.teal, 'feature': 'app_attendance_report'},
+          {'icon': Icons.notifications, 'label': 'Notice', 'color': Colors.purple, 'feature': 'app_notice'},
+          {'icon': Icons.calendar_today, 'label': 'Class Routine', 'color': Colors.green, 'feature': 'app_class_routine'},
+          {'icon': Icons.email, 'label': 'Message', 'color': Colors.blueAccent, 'feature': 'app_message'},
+          {'icon': Icons.card_giftcard, 'label': 'Holiday', 'color': Colors.red, 'feature': 'app_holiday'},
+          {'icon': Icons.home_work, 'label': 'Homework', 'color': Colors.orange, 'feature': 'app_homework'},
+          {'icon': Icons.library_books, 'label': 'Library', 'color': Colors.purple, 'feature': 'app_library'},
+          {'icon': Icons.qr_code_scanner, 'label': 'QR Scanner', 'color': Colors.teal, 'feature': 'app_qr_scanner'},
+          {'icon': Icons.fact_check, 'label': 'Scan Report', 'color': Colors.indigo, 'feature': 'app_scan_report'},
+        ];
+        final menuItems = catalog.where((item) {
+          final feature = item['feature'] as String;
+          return feature.isEmpty || allowed.contains(feature);
+        }).toList();
+        final showBalance = allowed.contains('app_balance_card');
+        final showPayButton = allowed.contains('app_pay_school_fees');
         return Scaffold(
           appBar: AppBar(
             title: Text(AppData.School_name, style: TextStyle(color: Colors.white, fontSize: 20)),
@@ -305,7 +229,8 @@ class DashboardScreen extends StatelessWidget {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  _recommendedProductListView(context),
+                  _recommendedProductListView(context, showBalance),
+                  if (showPayButton)
                   _neumorphicButton("Pay School Fees", () async {
                     final prefs = await SharedPreferences.getInstance();
                     Navigator.push(
@@ -353,6 +278,10 @@ class DashboardScreen extends StatelessWidget {
                             Navigator.pushReplacement(
                                 context, MaterialPageRoute(builder: (context) => AttendanceScreen()));
                           }
+                          else if(menuItems[index]['label']=='Attendance Report'){
+                            Navigator.push(
+                                context, MaterialPageRoute(builder: (context) => const ParentAttendanceScreen()));
+                          }
                           else if(menuItems[index]['label']=='Notice'){
                             Navigator.pushReplacement(
                                 context, MaterialPageRoute(builder: (context) => NoticeScreen()));
@@ -381,6 +310,12 @@ class DashboardScreen extends StatelessWidget {
                             Navigator.push(
                               context, 
                               MaterialPageRoute(builder: (context) => QrCodeScannerScreen())
+                            );
+                          }
+                          else if(menuItems[index]['label']=='Scan Report'){
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const QrScanReportScreen())
                             );
                           }
                         },
@@ -451,6 +386,8 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) async {
+     final prefs = await SharedPreferences.getInstance();
+     await prefs.remove('app_features');
      await DatabaseHelper.instance.logOutUser();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => LoginScreen()),
@@ -536,8 +473,9 @@ class DashboardScreen extends StatelessWidget {
 class StudentCardWidget extends StatefulWidget {
   final List<Map<String, dynamic>> students;
   final String roleId;
+  final bool showBalance;
 
-  const StudentCardWidget({required this.students, required this.roleId, super.key});
+  const StudentCardWidget({required this.students, required this.roleId, required this.showBalance, super.key});
 
   @override
   State<StudentCardWidget> createState() => _StudentCardWidgetState();
@@ -647,14 +585,14 @@ class _StudentCardWidgetState extends State<StudentCardWidget> {
                         color: Colors.white,
                       ),
                     ),
-                    widget.roleId != '7'
-                        ? const SizedBox(height: 4)
-                        : Text(
+                    widget.showBalance
+                        ? Text(
                       "Remained : TZS ${DatabaseHelper.formatAmount(selectedStudent['remained_amount'])}",
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Colors.white,
                       ),
-                    ),
+                    )
+                        : const SizedBox(height: 4),
                   ],
                 ),
               ),

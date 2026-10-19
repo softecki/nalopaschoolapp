@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
@@ -49,6 +50,35 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
     return 0.0;
   }
 
+  Future<Map<String, double>?> _currentLocation() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      return {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> scanQrCode(String controlNumber) async {
     if (_hasProcessedScan) return;
 
@@ -62,6 +92,7 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
     await controller?.stop();
 
     try {
+      final location = await _currentLocation();
       final response = await http
           .post(
             Uri.parse('$baseUrl/parent/qr-code/scan'),
@@ -72,9 +103,11 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
             body: jsonEncode({
               'control_number': controlNumber,
               'scan_date': DateTime.now().toIso8601String(),
+              if (location != null) 'latitude': location['latitude'],
+              if (location != null) 'longitude': location['longitude'],
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 20));
 
       final data = jsonDecode(response.body);
 
@@ -285,6 +318,17 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
             children: [
               _row("Student",
                   scanResult!['student_name']),
+              if ((scanResult!['class_name'] ?? '').toString().isNotEmpty)
+                _row("Class", scanResult!['class_name']),
+              _row("Attendance", scanResult!['attendance_status'] ?? 'Present'),
+              if ((scanResult!['day_period'] ?? '').toString().isNotEmpty)
+                _row("Period", scanResult!['day_period']),
+              _row(
+                "Location",
+                (scanResult!['latitude'] != null && scanResult!['longitude'] != null)
+                    ? '${scanResult!['latitude']}, ${scanResult!['longitude']}'
+                    : 'Not available',
+              ),
               // _row("Class",
               //     scanResult!['class_name']),
               _row(

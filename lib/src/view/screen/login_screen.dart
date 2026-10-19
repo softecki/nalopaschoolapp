@@ -61,6 +61,10 @@ class LoginScreen extends StatelessWidget {
 
       //
       await prefs.setString('role', userData['role_id'].toString());
+      final features = responseBody['data']['app_features'];
+      if (features is List) {
+        await prefs.setString('app_features', jsonEncode(features));
+      }
       final users = {
         'name': userData['name'],
         'phone': userData['phone'].toString(),

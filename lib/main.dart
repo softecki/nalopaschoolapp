@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:dodomaapp/src/view/screen/login_screen.dart';
-import 'package:dodomaapp/src/view/screen/menu_screen.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' show PointerDeviceKind;
 import 'package:dodomaapp/core/app_theme.dart';
@@ -10,7 +9,6 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'core/app_color.dart';
 import 'core/app_data.dart';
 import 'generated/assets.dart';
 
@@ -55,14 +53,6 @@ class _SplashScreenState extends State< SplashScreen> {
   }
 
   Future<void> splash(BuildContext context) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(color: AppColor.primaryColor),
-      ),
-    );
-
     try {
       final url = Uri.parse('${AppData.url}/splash');
       final info = await PackageInfo.fromPlatform();
@@ -81,8 +71,7 @@ class _SplashScreenState extends State< SplashScreen> {
 
         await _storeDataLocally(data);
 
-        Navigator.of(context).pop(); // Close loading
-
+        if (!context.mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -143,7 +132,7 @@ class _SplashScreenState extends State< SplashScreen> {
   }
 
   void _showError(String message) {
-    Navigator.of(context).pop(); // Close loading
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -154,11 +143,37 @@ class _SplashScreenState extends State< SplashScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFccbd00),
       body: Center(
-        child: Image.asset(
-          Assets.imagesNalopa,
-          fit: BoxFit.cover,
-          width: 200,
-          height: 200,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                Assets.imagesNalopa,
+                fit: BoxFit.contain,
+                width: 140,
+                height: 140,
+              ),
+              const SizedBox(height: 28),
+              const Text(
+                'Welcome to Nalopa School',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Please wait while the app is loading',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 15),
+              ),
+              const SizedBox(height: 28),
+              const CircularProgressIndicator(color: Colors.white),
+            ],
+          ),
         ),
       ),
     );

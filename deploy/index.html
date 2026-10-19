@@ -41,6 +41,23 @@
   <script src="sql-wasm.js"></script>
 
   <style>
+    html, body { margin: 0; background: #ccbd00; }
+    #welcome-loader {
+      position: fixed; inset: 0; z-index: 2147483646;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 24px; box-sizing: border-box;
+      background: #ccbd00; color: #fff; text-align: center;
+      font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    }
+    #welcome-loader img { width: 120px; height: 120px; object-fit: contain; }
+    #welcome-loader h1 { margin: 8px 0 0; font-size: 24px; font-weight: 700; }
+    #welcome-loader p { margin: 0; font-size: 16px; }
+    #welcome-loader .spinner {
+      width: 36px; height: 36px; margin-top: 8px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.35); border-top-color: #fff;
+      animation: welcome-spin .8s linear infinite;
+    }
+    @keyframes welcome-spin { to { transform: rotate(360deg); } }
     #pwa-install-banner {
       position: fixed; top: 12px; left: 50%; z-index: 2147483647;
       transform: translate(-50%, -150%); transition: transform .35s ease;
@@ -66,6 +83,12 @@
   </style>
 </head>
 <body>
+  <div id="welcome-loader" role="status" aria-live="polite">
+    <img src="icons/Icon-192.png" alt="Nalopa School">
+    <h1>Welcome to Nalopa School</h1>
+    <p>Please wait while the app is loading</p>
+    <div class="spinner"></div>
+  </div>
   <div id="pwa-install-banner" role="dialog" aria-live="polite" aria-label="Install Nalopa School app">
     <img src="icons/Icon-192.png" alt="Nalopa School">
     <div class="pwa-text">
@@ -133,6 +156,12 @@
     })();
   </script>
 
-  <script src="flutter_bootstrap.js?v=20261015_104930" async></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var loader = document.getElementById('welcome-loader');
+      if (loader) loader.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js?v=20261019_173027" async></script>
 </body>
 </html>
