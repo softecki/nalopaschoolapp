@@ -52,27 +52,29 @@ class LoginScreen extends StatelessWidget {
       prefs.setString('code_number', emailController.text.toString());
       final user = await DatabaseHelper.instance.getUserByEmail(email);
       final responseBody = jsonDecode(response.body);
-      final userData = responseBody['data']['user'];
-      final studentData = responseBody['data']['student'];
-      final parentData = responseBody['data']['parent'];
-      final feesAssignStudent = responseBody['data']['feesAssignChildren'];
-      final transactions = responseBody['data']['transactions'];
-      final staffs = responseBody['data']['staff'];
+      final userData = Map<String, dynamic>.from(responseBody['data']['user'] as Map);
+      final studentData = responseBody['data']['student'] is List ? responseBody['data']['student'] as List : [];
+      final parentData = responseBody['data']['parent'] is List ? responseBody['data']['parent'] as List : [];
+      final feesAssignStudent = responseBody['data']['feesAssignChildren'] is List ? responseBody['data']['feesAssignChildren'] as List : [];
+      final transactions = responseBody['data']['transactions'] is List ? responseBody['data']['transactions'] as List : [];
+      final staffs = responseBody['data']['staff'] is List ? responseBody['data']['staff'] as List : [];
 
       //
-      await prefs.setString('role', userData['role_id'].toString());
+      await prefs.setString('role', userData['role_id']?.toString() ?? '');
       final features = responseBody['data']['app_features'];
       if (features is List) {
         await prefs.setString('app_features', jsonEncode(features));
+      } else {
+        await prefs.remove('app_features');
       }
       final users = {
-        'name': userData['name'],
-        'phone': userData['phone'].toString(),
-        'email': userData['email'].toString(),
-        'role_id': userData['role_id'].toString(),
+        'name': userData['name']?.toString() ?? '',
+        'phone': userData['phone']?.toString() ?? '',
+        'email': userData['email']?.toString() ?? '',
+        'role_id': userData['role_id']?.toString() ?? '',
         'password': password,
         'status':"1",
-        'id': userData['id'].toString(),
+        'id': userData['id']?.toString() ?? '',
       };
 
       // Save to database
@@ -80,27 +82,27 @@ class LoginScreen extends StatelessWidget {
         await DatabaseHelper.instance.insertUser(users);
       }
 
-      for(var student in studentData ) {
-        await DatabaseHelper.instance.insertStudent(student);
+      for (var student in studentData) {
+        try { await DatabaseHelper.instance.insertStudent(Map<String, dynamic>.from(student as Map)); } catch (_) {}
       }
-      for(var parent in parentData ) {
-        await DatabaseHelper.instance.insertParent(parent);
+      for (var parent in parentData) {
+        try { await DatabaseHelper.instance.insertParent(Map<String, dynamic>.from(parent as Map)); } catch (_) {}
       }
 
       await DatabaseHelper.instance.deleteFeesAssignmentsForStudents(
-        (studentData as List).map((s) => s['id']),
+        studentData.map((s) => s is Map ? s['id'] : null),
       );
-      for(var feesAssign in feesAssignStudent ) {
-          await DatabaseHelper.instance.insertFeesAssignment(feesAssign);
+      for (var feesAssign in feesAssignStudent) {
+        try { await DatabaseHelper.instance.insertFeesAssignment(Map<String, dynamic>.from(feesAssign as Map)); } catch (_) {}
       }
       await DatabaseHelper.instance.saveFeesSummary(responseBody['data']['feesSummary']);
 
       for (var transaction in transactions) {
-        await DatabaseHelper.instance.insertFeeTransactions(transaction);
+        try { await DatabaseHelper.instance.insertFeeTransactions(Map<String, dynamic>.from(transaction as Map)); } catch (_) {}
       }
 
       for (var staff in staffs) {
-        await DatabaseHelper.instance.insertStaff(staff);
+        try { await DatabaseHelper.instance.insertStaff(Map<String, dynamic>.from(staff as Map)); } catch (_) {}
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Successful')),

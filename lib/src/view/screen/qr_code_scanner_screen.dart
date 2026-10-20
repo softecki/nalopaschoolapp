@@ -3,7 +3,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class QrCodeScannerScreen extends StatefulWidget {
@@ -113,38 +112,107 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
 
       if (!mounted) return;
 
+      if (!mounted) return;
+      setState(() => isLoading = false);
+
       if (response.statusCode == 200 &&
           data['status'] == true &&
           data['data'] != null) {
-        setState(() {
-          scanResult =
-              Map<String, dynamic>.from(data['data']);
-          scannedControlNumber = controlNumber;
-        });
+        final result = Map<String, dynamic>.from(data['data']);
+        scannedControlNumber = controlNumber;
+        final cleared = _safeDouble(result['total_amount']) <= 0;
+        await _showOutcome(
+          cleared: cleared,
+          name: result['student_name']?.toString() ?? '',
+          className: result['class_name']?.toString() ?? '',
+        );
       } else {
-        setState(() {
-          errorMessage =
-              data['message'] ?? 'Scan failed';
-        });
+        await _showOutcome(
+          cleared: false,
+          message: data['message']?.toString() ?? 'Scan failed',
+        );
       }
     } on TimeoutException {
       if (!mounted) return;
-      setState(() {
-        errorMessage = 'Request timed out';
-      });
+      setState(() => isLoading = false);
+      await _showOutcome(cleared: false, message: 'Request timed out');
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        errorMessage = e.toString();
-      });
+      setState(() => isLoading = false);
+      await _showOutcome(cleared: false, message: e.toString());
     }
 
-    if (!mounted) return;
+    _resumeScanning();
+  }
 
+  Future<void> _showOutcome({
+    required bool cleared,
+    String name = '',
+    String className = '',
+    String? message,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                message != null
+                    ? Icons.error_outline
+                    : (cleared ? Icons.check_circle : Icons.close),
+                color: message != null
+                    ? Colors.red
+                    : (cleared ? Colors.green : Colors.red),
+                size: 88,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message ?? (cleared ? 'Cleared' : 'Uncleared - Not Approved'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: message != null
+                      ? Colors.red
+                      : (cleared ? Colors.green : Colors.red),
+                ),
+              ),
+              if (name.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ],
+              if (className.isNotEmpty)
+                Text(className, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15)),
+            ],
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('OK'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _resumeScanning() {
+    if (!mounted) return;
     setState(() {
       isLoading = false;
+      errorMessage = null;
+      scanResult = null;
       _hasProcessedScan = false;
+      showManualInput = false;
     });
+    controller?.start();
   }
 
   void _handleBarcode(BarcodeCapture capture) {
@@ -292,105 +360,10 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
       );
     }
 
-    if (scanResult == null) {
-      return const Center(
-        child: Text(
-          "Scan a QR code to see results",
-          style: TextStyle(fontSize: 16),
-        ),
-      );
-    }
-
-    double totalAmount = _safeDouble(scanResult!['total_amount']);
-
-    return SingleChildScrollView(
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding:
-              const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              _row("Student",
-                  scanResult!['student_name']),
-              if ((scanResult!['class_name'] ?? '').toString().isNotEmpty)
-                _row("Class", scanResult!['class_name']),
-              _row("Attendance", scanResult!['attendance_status'] ?? 'Present'),
-              if ((scanResult!['day_period'] ?? '').toString().isNotEmpty)
-                _row("Period", scanResult!['day_period']),
-              _row(
-                "Location",
-                (scanResult!['latitude'] != null && scanResult!['longitude'] != null)
-                    ? '${scanResult!['latitude']}, ${scanResult!['longitude']}'
-                    : 'Not available',
-              ),
-              // _row("Class",
-              //     scanResult!['class_name']),
-              _row(
-                  "Total Amount",
-                  "TZS ${NumberFormat('#,##0.00').format(
-                      _safeDouble(
-                          scanResult!['total_amount']))}"),
-                           const SizedBox(height: 10),
-
-    // Status Text
-    Text(
-      totalAmount > 0
-          ? "UNCLEARED - NOT APPROVED"
-          : "APPROVED - ALLOWED",
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: totalAmount > 0
-            ? Colors.red
-            : Colors.green,
-      ),
-    ),
-                          
-              // _row(
-              //     "Paid",
-              //     "TZS ${NumberFormat('#,##0.00').format(
-              //         _safeDouble(
-              //             scanResult!['amount_paid']))}"),
-              // _row(
-              //     "Balance",
-              //     "TZS ${NumberFormat('#,##0.00').format(
-              //         _safeDouble(
-              //             scanResult!['balance']))}"),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _row(String title, dynamic value) {
-    return Padding(
-      padding:
-          const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title,
-              style: const TextStyle(
-                  fontWeight:
-                      FontWeight.w600)),
-          Flexible(
-            child: Text(
-              value?.toString() ?? "-",
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                  fontWeight:
-                      FontWeight.w500),
-            ),
-          ),
-        ],
+    return const Center(
+      child: Text(
+        "Scan a QR code",
+        style: TextStyle(fontSize: 16),
       ),
     );
   }

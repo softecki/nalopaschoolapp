@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Nalopa School parent portal: fees, payments, results and notices.">
+  <meta name="theme-color" content="#ccbd00">
+  <meta name="application-name" content="Nalopa School">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Nalopa School">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon.png"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/Icon-192.png"/>
+
+  <title>Nalopa School</title>
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- Drift Web Database Support (SQL.js required for Drift WebDatabase) -->
+  <script src="sql-wasm.js"></script>
+
+  <style>
+    html, body { margin: 0; background: #ccbd00; }
+    #welcome-loader {
+      position: fixed; inset: 0; z-index: 2147483646;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 24px; box-sizing: border-box;
+      background: #ccbd00; color: #fff; text-align: center;
+      font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    }
+    #welcome-loader img { width: 120px; height: 120px; object-fit: contain; }
+    #welcome-loader h1 { margin: 8px 0 0; font-size: 24px; font-weight: 700; }
+    #welcome-loader p { margin: 0; font-size: 16px; }
+    #welcome-loader .spinner {
+      width: 36px; height: 36px; margin-top: 8px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.35); border-top-color: #fff;
+      animation: welcome-spin .8s linear infinite;
+    }
+    @keyframes welcome-spin { to { transform: rotate(360deg); } }
+    #pwa-install-banner {
+      position: fixed; inset: 0; z-index: 2147483647;
+      display: none; align-items: center; justify-content: center;
+      padding: 20px; box-sizing: border-box; background: rgba(0,0,0,.5);
+      font-family: Roboto, "Segoe UI", Arial, sans-serif; color: #222;
+    }
+    #pwa-install-banner.show { display: flex; }
+    #pwa-install-banner .pwa-card {
+      width: 100%; max-width: 360px; background: #fff; border-radius: 16px;
+      padding: 22px 18px 16px; text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,.28);
+    }
+    #pwa-install-banner img { width: 72px; height: 72px; border-radius: 16px; }
+    #pwa-install-banner .pwa-title { font-weight: 700; font-size: 20px; margin-top: 12px; }
+    #pwa-install-banner .pwa-sub { font-size: 14px; color: #444; margin-top: 8px; line-height: 1.45; }
+    #pwa-install-banner .pwa-actions { display: flex; gap: 10px; margin-top: 18px; }
+    #pwa-install-banner button {
+      font: inherit; cursor: pointer; border: 0; border-radius: 10px;
+      flex: 1; padding: 12px 10px; font-weight: 700; font-size: 15px;
+    }
+    #pwa-install-banner .pwa-install { background: #ccbd00; color: #fff; }
+    #pwa-install-banner .pwa-close { background: #f2f2f2; color: #444; }
+  </style>
+</head>
+<body>
+  <div id="welcome-loader" role="status" aria-live="polite">
+    <img src="icons/Icon-192.png" alt="Nalopa School">
+    <h1>Welcome to Nalopa School</h1>
+    <p>Please wait while the app is loading</p>
+    <div class="spinner"></div>
+  </div>
+  <div id="pwa-install-banner" role="dialog" aria-modal="true" aria-label="Install Nalopa School app">
+    <div class="pwa-card">
+      <img src="icons/Icon-192.png" alt="Nalopa School">
+      <div class="pwa-title">Install Nalopa School</div>
+      <div class="pwa-sub" id="pwa-install-sub">Add the app to your home screen for quick access to fees, payments and results.</div>
+      <div class="pwa-actions">
+        <button type="button" class="pwa-close" id="pwa-install-close">Not now</button>
+        <button type="button" class="pwa-install" id="pwa-install-btn">Install</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var banner = document.getElementById('pwa-install-banner');
+      var installBtn = document.getElementById('pwa-install-btn');
+      var closeBtn = document.getElementById('pwa-install-close');
+      var sub = document.getElementById('pwa-install-sub');
+      var deferredPrompt = null;
+      var ua = window.navigator.userAgent;
+      var isIos = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      function isStandalone() {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      }
+      function closedThisVisit() {
+        try { return sessionStorage.getItem('pwa_install_closed') === '1'; } catch (e) { return false; }
+      }
+      function show() {
+        if (isStandalone() || closedThisVisit() || !banner) return;
+        document.body.appendChild(banner);
+        banner.classList.add('show');
+      }
+      function hide(remember) {
+        banner.classList.remove('show');
+        if (remember) { try { sessionStorage.setItem('pwa_install_closed', '1'); } catch (e) {} }
+      }
+
+      if (isIos && !isStandalone()) {
+        sub.innerHTML = 'Tap the <b>Share</b> button, then <b>Add to Home Screen</b>.';
+      }
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        show();
+      });
+
+      installBtn.addEventListener('click', function () {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function (choice) {
+            hide(choice.outcome !== 'accepted');
+            deferredPrompt = null;
+          });
+          return;
+        }
+        if (isIos) { hide(true); return; }
+        sub.innerHTML = 'Open the browser menu <b>⋮</b> and tap <b>Install app</b> or <b>Add to Home screen</b>.';
+      });
+      closeBtn.addEventListener('click', function () { hide(true); });
+      banner.addEventListener('click', function (e) { if (e.target === banner) hide(true); });
+
+      window.addEventListener('appinstalled', function () { hide(false); deferredPrompt = null; });
+      window.addEventListener('flutter-first-frame', function () { setTimeout(show, 700); });
+      setTimeout(show, 6000);
+    })();
+  </script>
+
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var loader = document.getElementById('welcome-loader');
+      if (loader) loader.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js?v=20261020_130649" async></script>
+</body>
+</html>

@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../core/app_color.dart';
 
@@ -13,17 +16,24 @@ class QrScanReportScreen extends StatefulWidget {
   State<QrScanReportScreen> createState() => _QrScanReportScreenState();
 }
 
+class _StudentScanRow {
+  final String name;
+  final String className;
+  final String day;
+  DateTime? firstScan;
+  DateTime? lastEvening;
+
+  _StudentScanRow({required this.name, required this.className, required this.day});
+}
+
 class _QrScanReportScreenState extends State<QrScanReportScreen> {
   final String baseUrl = 'https://nalopaschool.softecki.com/api';
   DateTime fromDate = DateTime.now();
   DateTime toDate = DateTime.now();
   bool isLoading = false;
+  bool isExporting = false;
   String? errorMessage;
-  int totalScans = 0;
-  int uniqueStudents = 0;
-  int morningCount = 0;
-  int eveningCount = 0;
-  List<Map<String, dynamic>> scans = [];
+  List<_StudentScanRow> rows = [];
 
   @override
   void initState() {
@@ -33,11 +43,40 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
 
   String _date(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
-  String _displayDate(String? value) {
-    if (value == null || value.isEmpty) return '';
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null) return value;
-    return DateFormat('dd MMM yyyy, HH:mm').format(parsed.toLocal());
+  String _clock(DateTime? value) {
+    if (value == null) return '-';
+    return DateFormat('dd MMM yyyy, HH:mm').format(value);
+  }
+
+  List<_StudentScanRow> _groupScans(List<Map<String, dynamic>> scans) {
+    final grouped = <String, _StudentScanRow>{};
+    for (final scan in scans) {
+      final parsed = DateTime.tryParse(scan['scan_date']?.toString() ?? '')?.toLocal();
+      if (parsed == null) continue;
+      final name = scan['student_name']?.toString().trim() ?? '';
+      final className = [scan['class_name'], scan['section_name']]
+          .where((part) => part != null && '$part'.trim().isNotEmpty)
+          .join(' - ');
+      final day = DateFormat('yyyy-MM-dd').format(parsed);
+      final key = '$name|$className|$day';
+      final row = grouped.putIfAbsent(key, () => _StudentScanRow(name: name, className: className, day: day));
+      if (row.firstScan == null || parsed.isBefore(row.firstScan!)) {
+        row.firstScan = parsed;
+      }
+      final period = scan['day_period']?.toString() ?? '';
+      final isEvening = period == 'Evening' || parsed.hour >= 12;
+      if (isEvening && (row.lastEvening == null || parsed.isAfter(row.lastEvening!))) {
+        row.lastEvening = parsed;
+      }
+    }
+
+    final list = grouped.values.toList()
+      ..sort((a, b) {
+        final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        if (byName != 0) return byName;
+        return (a.firstScan ?? DateTime(2000)).compareTo(b.firstScan ?? DateTime(2000));
+      });
+    return list;
   }
 
   Future<void> loadReport() async {
@@ -60,28 +99,21 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
 
       if (response.statusCode == 200 && body['status'] == true) {
         final data = body['data'] as Map<String, dynamic>;
-        setState(() {
-          totalScans = data['total_scans'] is int ? data['total_scans'] : int.tryParse('${data['total_scans']}') ?? 0;
-          uniqueStudents = data['unique_students'] is int
-              ? data['unique_students']
-              : int.tryParse('${data['unique_students']}') ?? 0;
-          morningCount = data['morning_count'] is int ? data['morning_count'] : int.tryParse('${data['morning_count']}') ?? 0;
-          eveningCount = data['evening_count'] is int ? data['evening_count'] : int.tryParse('${data['evening_count']}') ?? 0;
-          scans = List<Map<String, dynamic>>.from(
-            (data['scans'] as List? ?? []).map((row) => Map<String, dynamic>.from(row)),
-          );
-        });
+        final scans = List<Map<String, dynamic>>.from(
+          (data['scans'] as List? ?? []).map((row) => Map<String, dynamic>.from(row)),
+        );
+        setState(() => rows = _groupScans(scans));
       } else {
         setState(() {
           errorMessage = body['message']?.toString() ?? 'Could not load the report';
-          scans = [];
+          rows = [];
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         errorMessage = e.toString();
-        scans = [];
+        rows = [];
       });
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -108,14 +140,65 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
     loadReport();
   }
 
+  Future<void> _exportPdf() async {
+    if (rows.isEmpty || isExporting) return;
+    setState(() => isExporting = true);
+    try {
+      final doc = pw.Document();
+      final title = 'Scan report ${DateFormat('dd MMM yyyy').format(fromDate)} - ${DateFormat('dd MMM yyyy').format(toDate)}';
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (context) => [
+            pw.Text('Nalopa School', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 4),
+            pw.Text(title, style: const pw.TextStyle(fontSize: 12)),
+            pw.SizedBox(height: 12),
+            pw.TableHelper.fromTextArray(
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+              cellStyle: const pw.TextStyle(fontSize: 10),
+              headers: const ['Name', 'Class', 'First scan', 'Last evening'],
+              data: rows
+                  .map((row) => [
+                        row.name,
+                        row.className,
+                        _clock(row.firstScan),
+                        _clock(row.lastEvening),
+                      ])
+                  .toList(),
+            ),
+          ],
+        ),
+      );
+      await Printing.layoutPdf(onLayout: (format) async => doc.save(), name: 'scan-report.pdf');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not export PDF: $e')));
+    } finally {
+      if (mounted) setState(() => isExporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final morningCount = rows.where((row) => row.firstScan != null && row.firstScan!.hour < 12).length;
+    final eveningCount = rows.where((row) => row.lastEvening != null).length;
+
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
         backgroundColor: AppColor.primaryColor,
         title: const Text('Scan Attendance', style: TextStyle(color: Colors.white, fontSize: 18)),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            tooltip: 'Export PDF',
+            onPressed: rows.isEmpty || isExporting ? null : _exportPdf,
+            icon: isExporting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.picture_as_pdf, color: Colors.white),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -143,7 +226,7 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Scans: $totalScans    Students: $uniqueStudents', style: const TextStyle(fontSize: 14)),
+              child: Text('Students: ${rows.length}', style: const TextStyle(fontSize: 14)),
             ),
           ),
           const SizedBox(height: 8),
@@ -173,28 +256,25 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
     if (errorMessage != null) {
       return Center(child: Text(errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)));
     }
-    if (scans.isEmpty) return const Center(child: Text('No scans for this period', style: TextStyle(fontSize: 16)));
+    if (rows.isEmpty) return const Center(child: Text('No scans for this period', style: TextStyle(fontSize: 16)));
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: scans.length,
+      itemCount: rows.length,
       itemBuilder: (context, index) {
-        final scan = scans[index];
-        final className = [scan['class_name'], scan['section_name']].where((part) => part != null && '$part'.isNotEmpty).join(' - ');
+        final row = rows[index];
         return Card(
           child: ListTile(
-            title: Text(scan['student_name']?.toString() ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            title: Text(row.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             subtitle: Text(
-              '${_displayDate(scan['scan_date']?.toString())}\n$className',
+              [
+                if (row.className.isNotEmpty) row.className,
+                'First scan: ${_clock(row.firstScan)}',
+                'Last evening: ${_clock(row.lastEvening)}',
+              ].join('\n'),
               style: const TextStyle(fontSize: 14),
             ),
             isThreeLine: true,
-            trailing: Text(
-              scan['is_counted'] == true || scan['is_counted'] == 1
-                  ? (scan['day_period']?.toString() ?? '')
-                  : '',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            ),
           ),
         );
       },
