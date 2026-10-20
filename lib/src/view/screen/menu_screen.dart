@@ -144,7 +144,7 @@ class DashboardScreen extends StatelessWidget {
           {'icon': Icons.assignment, 'label': 'Upload Result', 'color': Colors.yellow, 'feature': 'app_upload_result'},
           {'icon': Icons.receipt_long, 'label': 'Payment List', 'color': Colors.blue, 'feature': 'app_payment_list'},
           {'icon': Icons.check_circle, 'label': 'Attendance', 'color': Colors.orange, 'feature': 'app_attendance'},
-          {'icon': Icons.fact_check, 'label': 'Attendance Report', 'color': Colors.teal, 'feature': 'app_attendance_report'},
+          {'icon': Icons.fact_check, 'label': 'Attendance', 'color': Colors.teal, 'feature': 'app_attendance_report'},
           {'icon': Icons.notifications, 'label': 'Notice', 'color': Colors.purple, 'feature': 'app_notice'},
           {'icon': Icons.calendar_today, 'label': 'Class Routine', 'color': Colors.green, 'feature': 'app_class_routine'},
           {'icon': Icons.email, 'label': 'Message', 'color': Colors.blueAccent, 'feature': 'app_message'},
@@ -274,13 +274,13 @@ class DashboardScreen extends StatelessWidget {
                             Navigator.pushReplacement(
                                 context, MaterialPageRoute(builder: (context) => ExamResultScreen()));
                           }
+                          else if(menuItems[index]['feature']=='app_attendance_report'){
+                            Navigator.push(
+                                context, MaterialPageRoute(builder: (context) => const ParentAttendanceScreen()));
+                          }
                           else if(menuItems[index]['label']=='Attendance'){
                             Navigator.pushReplacement(
                                 context, MaterialPageRoute(builder: (context) => AttendanceScreen()));
-                          }
-                          else if(menuItems[index]['label']=='Attendance Report'){
-                            Navigator.push(
-                                context, MaterialPageRoute(builder: (context) => const ParentAttendanceScreen()));
                           }
                           else if(menuItems[index]['label']=='Notice'){
                             Navigator.pushReplacement(

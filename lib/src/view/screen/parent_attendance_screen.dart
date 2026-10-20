@@ -95,7 +95,7 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
       appBar: AppBar(
         backgroundColor: AppColor.primaryColor,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Attendance Report', style: TextStyle(color: Colors.white, fontSize: 18)),
+        title: const Text('Attendance', style: TextStyle(color: Colors.white, fontSize: 18)),
       ),
       body: Column(
         children: [
