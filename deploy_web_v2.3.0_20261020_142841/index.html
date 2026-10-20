@@ -108,6 +108,7 @@
       var closeBtn = document.getElementById('pwa-install-close');
       var sub = document.getElementById('pwa-install-sub');
       var deferredPrompt = null;
+      var installRequested = false;
       var ua = window.navigator.userAgent;
       var isIos = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -126,35 +127,52 @@
         banner.classList.remove('show');
         if (remember) { try { sessionStorage.setItem('pwa_install_closed', '1'); } catch (e) {} }
       }
+      function runInstallPrompt(promptEvent) {
+        if (!promptEvent) return;
+        installRequested = false;
+        promptEvent.prompt();
+        promptEvent.userChoice.then(function (choice) {
+          deferredPrompt = null;
+          if (choice.outcome === 'accepted') hide(false);
+        }).catch(function () {
+          sub.innerHTML = 'Open the browser menu <b>⋮</b> and tap <b>Install app</b>.';
+        });
+      }
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('flutter_service_worker.js?v=719202357') /* Flutter's service worker is deprecated and will be removed in a future Flutter release. */.catch(function () {});
+      }
 
       if (isIos && !isStandalone()) {
-        sub.innerHTML = 'Tap the <b>Share</b> button, then <b>Add to Home Screen</b>.';
+        sub.innerHTML = 'Tap the <b>Share</b> button, then choose <b>Add to Home Screen</b>.';
+        installBtn.textContent = 'OK';
       }
 
       window.addEventListener('beforeinstallprompt', function (e) {
         e.preventDefault();
         deferredPrompt = e;
+        installBtn.textContent = 'Install';
         show();
+        if (installRequested) runInstallPrompt(e);
       });
 
       installBtn.addEventListener('click', function () {
         if (deferredPrompt) {
-          deferredPrompt.prompt();
-          deferredPrompt.userChoice.then(function (choice) {
-            hide(choice.outcome !== 'accepted');
-            deferredPrompt = null;
-          });
+          runInstallPrompt(deferredPrompt);
           return;
         }
         if (isIos) { hide(true); return; }
-        sub.innerHTML = 'Open the browser menu <b>⋮</b> and tap <b>Install app</b> or <b>Add to Home screen</b>.';
+        installRequested = true;
+        sub.textContent = 'Tap Install once more if the phone install window does not open.';
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('flutter_service_worker.js').catch(function () {});
+        }
       });
       closeBtn.addEventListener('click', function () { hide(true); });
       banner.addEventListener('click', function (e) { if (e.target === banner) hide(true); });
 
       window.addEventListener('appinstalled', function () { hide(false); deferredPrompt = null; });
-      window.addEventListener('flutter-first-frame', function () { setTimeout(show, 700); });
-      setTimeout(show, 6000);
+      window.addEventListener('flutter-first-frame', function () { setTimeout(show, 1200); });
     })();
   </script>
 
@@ -164,6 +182,6 @@
       if (loader) loader.remove();
     });
   </script>
-  <script src="flutter_bootstrap.js?v=20261020_130649" async></script>
+  <script src="flutter_bootstrap.js?v=20261020_142841" async></script>
 </body>
 </html>

@@ -18,12 +18,11 @@ class QrScanReportScreen extends StatefulWidget {
 
 class _StudentScanRow {
   final String name;
-  final String className;
   final String day;
-  DateTime? firstScan;
-  DateTime? lastEvening;
+  bool morning = false;
+  bool evening = false;
 
-  _StudentScanRow({required this.name, required this.className, required this.day});
+  _StudentScanRow({required this.name, required this.day});
 }
 
 class _QrScanReportScreenState extends State<QrScanReportScreen> {
@@ -43,9 +42,17 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
 
   String _date(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
-  String _clock(DateTime? value) {
-    if (value == null) return '-';
-    return DateFormat('dd MMM yyyy, HH:mm').format(value);
+  String _twoNames(Map<String, dynamic> scan) {
+    final first = (scan['first_name'] ?? '').toString().trim();
+    final last = (scan['last_name'] ?? '').toString().trim();
+    if (first.isNotEmpty || last.isNotEmpty) {
+      final firstWord = first.isEmpty ? '' : first.split(RegExp(r'\s+')).first;
+      return [firstWord, last].where((part) => part.isNotEmpty).join(' ');
+    }
+    final parts = (scan['student_name'] ?? '').toString().trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+    if (parts.isEmpty) return '';
+    if (parts.length == 1) return parts.first;
+    return '${parts.first} ${parts.last}';
   }
 
   List<_StudentScanRow> _groupScans(List<Map<String, dynamic>> scans) {
@@ -53,28 +60,22 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
     for (final scan in scans) {
       final parsed = DateTime.tryParse(scan['scan_date']?.toString() ?? '')?.toLocal();
       if (parsed == null) continue;
-      final name = scan['student_name']?.toString().trim() ?? '';
-      final className = [scan['class_name'], scan['section_name']]
-          .where((part) => part != null && '$part'.trim().isNotEmpty)
-          .join(' - ');
+      final name = _twoNames(scan);
       final day = DateFormat('yyyy-MM-dd').format(parsed);
-      final key = '$name|$className|$day';
-      final row = grouped.putIfAbsent(key, () => _StudentScanRow(name: name, className: className, day: day));
-      if (row.firstScan == null || parsed.isBefore(row.firstScan!)) {
-        row.firstScan = parsed;
-      }
-      final period = scan['day_period']?.toString() ?? '';
-      final isEvening = period == 'Evening' || parsed.hour >= 12;
-      if (isEvening && (row.lastEvening == null || parsed.isAfter(row.lastEvening!))) {
-        row.lastEvening = parsed;
+      final studentKey = scan['student_id']?.toString().isNotEmpty == true ? scan['student_id'].toString() : name;
+      final row = grouped.putIfAbsent('$studentKey|$day', () => _StudentScanRow(name: name, day: day));
+      if (parsed.hour < 12) {
+        row.morning = true;
+      } else {
+        row.evening = true;
       }
     }
 
     final list = grouped.values.toList()
       ..sort((a, b) {
-        final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-        if (byName != 0) return byName;
-        return (a.firstScan ?? DateTime(2000)).compareTo(b.firstScan ?? DateTime(2000));
+        final byDay = a.day.compareTo(b.day);
+        if (byDay != 0) return byDay;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
     return list;
   }
@@ -157,13 +158,12 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
             pw.TableHelper.fromTextArray(
               headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
               cellStyle: const pw.TextStyle(fontSize: 10),
-              headers: const ['Name', 'Class', 'First scan', 'Last evening'],
+              headers: const ['Name', 'Morning', 'Evening'],
               data: rows
                   .map((row) => [
-                        row.name,
-                        row.className,
-                        _clock(row.firstScan),
-                        _clock(row.lastEvening),
+                        _date(fromDate) == _date(toDate) ? row.name : '${row.name}\n${row.day}',
+                        row.morning ? 'Yes' : '',
+                        row.evening ? 'Yes' : '',
                       ])
                   .toList(),
             ),
@@ -181,8 +181,8 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final morningCount = rows.where((row) => row.firstScan != null && row.firstScan!.hour < 12).length;
-    final eveningCount = rows.where((row) => row.lastEvening != null).length;
+    final morningCount = rows.where((row) => row.morning).length;
+    final eveningCount = rows.where((row) => row.evening).length;
 
     return Scaffold(
       backgroundColor: Colors.grey[200],
@@ -216,9 +216,9 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                Expanded(child: _summary('Morning', '$morningCount')),
+                Expanded(child: _summary('Morning students', '$morningCount')),
                 const SizedBox(width: 8),
-                Expanded(child: _summary('Evening', '$eveningCount')),
+                Expanded(child: _summary('Evening students', '$eveningCount')),
               ],
             ),
           ),
@@ -258,26 +258,55 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
     }
     if (rows.isEmpty) return const Center(child: Text('No scans for this period', style: TextStyle(fontSize: 16)));
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: rows.length,
-      itemBuilder: (context, index) {
-        final row = rows[index];
-        return Card(
-          child: ListTile(
-            title: Text(row.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            subtitle: Text(
-              [
-                if (row.className.isNotEmpty) row.className,
-                'First scan: ${_clock(row.firstScan)}',
-                'Last evening: ${_clock(row.lastEvening)}',
-              ].join('\n'),
-              style: const TextStyle(fontSize: 14),
-            ),
-            isThreeLine: true,
+    final showDate = _date(fromDate) != _date(toDate);
+    return Column(
+      children: [
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          child: const Row(
+            children: [
+              Expanded(flex: 2, child: Text('Name', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+              Expanded(child: Text('Morning', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+              Expanded(child: Text('Evening', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+            ],
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: rows.length,
+            itemBuilder: (context, index) {
+              final row = rows[index];
+              return Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                margin: const EdgeInsets.only(top: 1),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(row.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          if (showDate) Text(row.day, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                        ],
+                      ),
+                    ),
+                    Expanded(child: _tick(row.morning)),
+                    Expanded(child: _tick(row.evening)),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
+  }
+
+  Widget _tick(bool scanned) {
+    if (!scanned) return const SizedBox.shrink();
+    return const Icon(Icons.check, color: Color(0xFF1B8A2F), size: 26);
   }
 }
