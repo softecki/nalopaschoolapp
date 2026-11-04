@@ -4,12 +4,13 @@ import 'dart:convert';
 import 'package:dodomaapp/core/app_color.dart';
 import 'package:dodomaapp/core/app_data.dart';
 import 'package:dodomaapp/src/view/screen/menu_screen.dart';
-import 'package:dodomaapp/src/view/screen/softpay_checkout_frame.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
-/// Loads SoftPay checkout_url so the parent can finish the payment.
+/// SoftPay Gate sets X-Frame-Options: deny, so checkout cannot run in an
+/// iframe. Open the hosted page in a new browser tab and poll status here.
 class SoftPayCheckoutScreen extends StatefulWidget {
   final String executionUrl;
   final String reference;
@@ -26,14 +27,20 @@ class SoftPayCheckoutScreen extends StatefulWidget {
   State<SoftPayCheckoutScreen> createState() => _SoftPayCheckoutScreenState();
 }
 
-class _SoftPayCheckoutScreenState extends State<SoftPayCheckoutScreen> {
+class _SoftPayCheckoutScreenState extends State<SoftPayCheckoutScreen>
+    with WidgetsBindingObserver {
   bool checking = false;
+  bool opening = false;
   String? statusNote;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openCheckout();
+    });
     _timer = Timer.periodic(const Duration(seconds: 8), (_) {
       _checkStatus(silent: true);
     });
@@ -41,14 +48,53 @@ class _SoftPayCheckoutScreenState extends State<SoftPayCheckoutScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
 
-  Future<void> _openExternal() async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkStatus(silent: true);
+    }
+  }
+
+  Future<void> _openCheckout() async {
     final uri = Uri.tryParse(widget.executionUrl);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (uri == null) {
+      if (mounted) {
+        setState(() => statusNote = 'Invalid payment page link.');
+      }
+      return;
+    }
+    if (opening) return;
+    setState(() => opening = true);
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!opened && mounted) {
+        setState(() {
+          statusNote =
+              'Could not open the payment page. Tap “Open payment page” to try again.';
+        });
+      } else if (mounted) {
+        setState(() {
+          statusNote = kIsWeb
+              ? 'Complete payment in the new tab, then return here. This screen checks status automatically.'
+              : 'Complete payment in your browser, then return here. This screen checks status automatically.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => statusNote = 'Could not open payment page: $e');
+      }
+    } finally {
+      if (mounted) setState(() => opening = false);
+    }
   }
 
   Future<void> _checkStatus({bool silent = false}) async {
@@ -114,70 +160,102 @@ class _SoftPayCheckoutScreenState extends State<SoftPayCheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
         backgroundColor: AppColor.primaryColor,
-        title: const Text('Checkout', style: TextStyle(color: Colors.white)),
+        title: const Text('SoftPay checkout', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          TextButton(
-            onPressed: checking ? null : () => _checkStatus(),
-            child: checking
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Check status', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
-      body: Column(
-        children: [
-          if (statusNote != null)
-            Material(
-              color: Colors.amber.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(statusNote!)),
-                  ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.open_in_new, size: 48, color: AppColor.primaryColor),
+              const SizedBox(height: 16),
+              Text(
+                'Finish payment in your browser',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Gate blocks payment pages inside the app, so SoftPay opens in a new tab. After you pay, come back and tap Check status if the app has not updated yet.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.black54,
+                      height: 1.4,
+                    ),
+              ),
+              const SizedBox(height: 20),
+              if (statusNote != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(statusNote!)),
+                    ],
+                  ),
                 ),
+              const Spacer(),
+              Text(
+                'Reference: ${widget.reference}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: Colors.black45),
               ),
-            ),
-          Expanded(
-            child: SoftPayCheckoutFrame(url: widget.executionUrl),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _openExternal,
-                      child: const Text('Open in browser'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColor.primaryColor,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: _done,
-                      child: const Text('Done'),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.primaryColor,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: opening ? null : _openCheckout,
+                icon: opening
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.open_in_browser),
+                label: Text(opening ? 'Opening…' : 'Open payment page'),
               ),
-            ),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: checking ? null : () => _checkStatus(),
+                child: checking
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Check status'),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: _done,
+                child: const Text('Back to menu'),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
