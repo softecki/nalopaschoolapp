@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'drift_database_connection.dart';
+import 'offline_scan_tables.dart';
 
 part 'drift_database.g.dart';
 
@@ -435,16 +436,35 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(createDriftConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
+
+  Future<void> createOfflineScanTables() async {
+    await customStatement(OfflineScanTables.students);
+    await customStatement(OfflineScanTables.scans);
+    await customStatement(OfflineScanTables.controlIndex);
+    await OfflineScanTables.addMissingColumns(
+      columnsOf: (table) async {
+        final rows = await customSelect('PRAGMA table_info($table)').get();
+        return rows.map((row) => row.data['name'].toString()).toList();
+      },
+      execute: customStatement,
+    );
+  }
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+        await createOfflineScanTables();
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // Handle migrations here
+        if (from < 4) {
+          await createOfflineScanTables();
+        }
+      },
+      beforeOpen: (_) async {
+        await createOfflineScanTables();
       },
     );
   }

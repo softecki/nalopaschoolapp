@@ -1,3 +1,5 @@
+import 'package:dodomaapp/src/data/offline_scan_store.dart';
+import 'package:dodomaapp/src/data/offline_sync.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -90,8 +92,12 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
 
     await controller?.stop();
 
+    final clientId = DateTime.now().microsecondsSinceEpoch.toString();
+    final scanDate = DateTime.now();
+    Map<String, double>? location;
+
     try {
-      final location = await _currentLocation();
+      location = await _currentLocation();
       final response = await http
           .post(
             Uri.parse('$baseUrl/parent/qr-code/scan'),
@@ -101,16 +107,15 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
             },
             body: jsonEncode({
               'control_number': controlNumber,
-              'scan_date': DateTime.now().toIso8601String(),
+              'scan_date': scanDate.toIso8601String(),
+              'client_scan_id': clientId,
               if (location != null) 'latitude': location['latitude'],
               if (location != null) 'longitude': location['longitude'],
             }),
           )
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 30));
 
       final data = jsonDecode(response.body);
-
-      if (!mounted) return;
 
       if (!mounted) return;
       setState(() => isLoading = false);
@@ -121,28 +126,130 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
         final result = Map<String, dynamic>.from(data['data']);
         scannedControlNumber = controlNumber;
         final cleared = _safeDouble(result['total_amount']) <= 0;
+        await OfflineScanStore.saveScan({
+          'client_scan_id': clientId,
+          'control_number': controlNumber,
+          'scan_date': result['scan_date'] ?? scanDate.toIso8601String(),
+          'student_id': result['student_id'],
+          'first_name': result['first_name'] ?? '',
+          'last_name': result['last_name'] ?? '',
+          'student_name': result['student_name'] ?? '',
+          'class_name': result['class_name'] ?? '',
+          'section_name': result['section_name'] ?? '',
+          'classes_id': result['classes_id'],
+          'section_id': result['section_id'],
+          'session_id': result['session_id'],
+          'total_amount': result['total_amount'] ?? 0,
+          'day_period': result['day_period'] ?? (scanDate.hour < 12 ? 'Morning' : 'Evening'),
+          'is_paid_complete': cleared,
+          'attendance_status': result['attendance_status'] ?? 'Present',
+          'latitude': location?['latitude'],
+          'longitude': location?['longitude'],
+          'synced': true,
+        });
         await _showOutcome(
           cleared: cleared,
           name: result['student_name']?.toString() ?? '',
           className: result['class_name']?.toString() ?? '',
         );
-      } else {
+      } else if (response.statusCode == 404) {
         await _showOutcome(
           cleared: false,
-          message: data['message']?.toString() ?? 'Scan failed',
+          message: data['message']?.toString() ?? 'Student not found',
+        );
+      } else {
+        await _finishOffline(
+          controlNumber: controlNumber,
+          clientId: clientId,
+          scanDate: scanDate,
+          location: location,
         );
       }
     } on TimeoutException {
-      if (!mounted) return;
-      setState(() => isLoading = false);
-      await _showOutcome(cleared: false, message: 'Request timed out');
+      await _finishOffline(
+        controlNumber: controlNumber,
+        clientId: clientId,
+        scanDate: scanDate,
+        location: location,
+      );
+    } on http.ClientException {
+      await _finishOffline(
+        controlNumber: controlNumber,
+        clientId: clientId,
+        scanDate: scanDate,
+        location: location,
+      );
     } catch (e) {
-      if (!mounted) return;
-      setState(() => isLoading = false);
-      await _showOutcome(cleared: false, message: e.toString());
+      final text = e.toString();
+      final offline = text.contains('SocketException') ||
+          text.contains('Failed host') ||
+          text.contains('ClientException') ||
+          text.contains('Connection');
+      if (offline) {
+        await _finishOffline(
+          controlNumber: controlNumber,
+          clientId: clientId,
+          scanDate: scanDate,
+          location: location,
+        );
+      } else if (mounted) {
+        setState(() => isLoading = false);
+        await _showOutcome(cleared: false, message: text);
+      }
     }
 
     _resumeScanning();
+  }
+
+  Future<void> _finishOffline({
+    required String controlNumber,
+    required String clientId,
+    required DateTime scanDate,
+    Map<String, double>? location,
+  }) async {
+    if (!mounted) return;
+    setState(() => isLoading = false);
+    final student = await OfflineScanStore.findStudent(controlNumber);
+    if (student == null) {
+      await _showOutcome(
+        cleared: false,
+        message: 'No saved student for this code. Open the app online once so the list can download.',
+      );
+      return;
+    }
+
+    final name = '${student['first_name'] ?? ''} ${student['last_name'] ?? ''}'.trim();
+    final due = OfflineScanStore.amountDue(student, scanDate);
+    final cleared = due <= 0;
+    await OfflineScanStore.saveScan({
+      'client_scan_id': clientId,
+      'control_number': controlNumber.trim(),
+      'scan_date': scanDate.toIso8601String(),
+      'student_id': student['student_id'],
+      'first_name': student['first_name'] ?? '',
+      'last_name': student['last_name'] ?? '',
+      'student_name': name,
+      'class_name': student['class_name'] ?? '',
+      'section_name': student['section_name'] ?? '',
+      'classes_id': student['classes_id'],
+      'section_id': student['section_id'],
+      'session_id': student['session_id'],
+      'total_amount': due,
+      'day_period': scanDate.hour < 12 ? 'Morning' : 'Evening',
+      'is_paid_complete': cleared,
+      'attendance_status': 'Present',
+      'latitude': location?['latitude'],
+      'longitude': location?['longitude'],
+      'synced': false,
+    });
+    scannedControlNumber = controlNumber;
+    unawaited(OfflineSync.requestSync());
+    await _showOutcome(
+      cleared: cleared,
+      name: name,
+      className: student['class_name']?.toString() ?? '',
+      note: 'Saved on this phone. It will be sent when internet returns.',
+    );
   }
 
   Future<void> _showOutcome({
@@ -150,6 +257,7 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
     String name = '',
     String className = '',
     String? message,
+    String? note,
   }) async {
     if (!mounted) return;
     await showDialog<void>(
@@ -187,6 +295,10 @@ class _QrCodeScannerScreenState extends State<QrCodeScannerScreen> {
               ],
               if (className.isNotEmpty)
                 Text(className, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15)),
+              if (note != null && note.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(note, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+              ],
             ],
           ),
           actions: [

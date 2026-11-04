@@ -10,6 +10,7 @@ import 'package:path/path.dart';
 // Drift database for web support
 import 'package:drift/drift.dart';
 import 'drift_database.dart';
+import 'offline_scan_tables.dart';
 
 // Import Exam class with alias to avoid conflict
 import '../view/screen/exam_list_screen.dart' as exam_screen;
@@ -128,7 +129,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -519,6 +520,20 @@ class DatabaseHelper {
     )
   ''');
 
+    await _createOfflineScanTables(db);
+  }
+
+  Future<void> _createOfflineScanTables(Database db) async {
+    await db.execute(OfflineScanTables.students);
+    await db.execute(OfflineScanTables.scans);
+    await db.execute(OfflineScanTables.controlIndex);
+    await OfflineScanTables.addMissingColumns(
+      columnsOf: (table) async {
+        final rows = await db.rawQuery('PRAGMA table_info($table)');
+        return rows.map((row) => row['name'].toString()).toList();
+      },
+      execute: db.execute,
+    );
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -535,6 +550,9 @@ class DatabaseHelper {
           updated_at TEXT
         )
       ''');
+    }
+    if (oldVersion < 4) {
+      await _createOfflineScanTables(db);
     }
   }
 

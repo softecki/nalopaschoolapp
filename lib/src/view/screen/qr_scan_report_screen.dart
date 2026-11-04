@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../../core/app_color.dart';
+import '../../data/offline_scan_store.dart';
 
 class QrScanReportScreen extends StatefulWidget {
   const QrScanReportScreen({Key? key}) : super(key: key);
@@ -103,22 +104,38 @@ class _QrScanReportScreenState extends State<QrScanReportScreen> {
         final scans = List<Map<String, dynamic>>.from(
           (data['scans'] as List? ?? []).map((row) => Map<String, dynamic>.from(row)),
         );
+        scans.addAll(await _localScans());
         setState(() => rows = _groupScans(scans));
       } else {
+        final local = await _localScans();
         setState(() {
-          errorMessage = body['message']?.toString() ?? 'Could not load the report';
-          rows = [];
+          rows = _groupScans(local);
+          errorMessage = local.isEmpty
+              ? (body['message']?.toString() ?? 'Could not load the report')
+              : null;
         });
       }
     } catch (e) {
       if (!mounted) return;
+      final local = await _localScans();
       setState(() {
-        errorMessage = e.toString();
-        rows = [];
+        rows = _groupScans(local);
+        errorMessage = local.isEmpty ? e.toString() : null;
       });
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _localScans() async {
+    final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+    final end = DateTime(toDate.year, toDate.month, toDate.day, 23, 59, 59);
+    final saved = await OfflineScanStore.scansOnDevice();
+    return saved.where((row) {
+      final parsed = DateTime.tryParse(row['scan_date']?.toString() ?? '')?.toLocal();
+      if (parsed == null) return false;
+      return !parsed.isBefore(start) && !parsed.isAfter(end);
+    }).toList();
   }
 
   Future<void> _pickDate({required bool isFrom}) async {

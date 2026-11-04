@@ -13,6 +13,7 @@ import '../../data/database_helper.dart';
 import '../widget/custom_button.dart';
 import '../widget/custom_text_field.dart';
 import '../widget/dropdown.dart';
+import 'softpay_checkout_screen.dart';
 
 class MakePayment extends StatefulWidget {
   final String phone;
@@ -30,11 +31,58 @@ class _MakePaymentState extends State<MakePayment> {
   List<Map<String, dynamic>> feesGroups = [];
   String? selectedFeesGroupId;
   bool isLoadingGroups = true;
+  String providerLabel = 'Malipo Mtandao';
+  String providerKey = 'malipo';
 
   @override
   void initState() {
     super.initState();
     _loadFeesGroups();
+    _loadProvider();
+  }
+
+  Future<void> _loadProvider() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedLabel = prefs.getString('mobile_money_label');
+      final savedKey = prefs.getString('mobile_money_provider');
+      final response = await http.get(
+        Uri.parse('${AppData.url}/payment/provider'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body is Map ? body['data'] : null;
+        if (data is Map) {
+          final label = data['label']?.toString();
+          final provider = data['provider']?.toString();
+          if (label != null && label.isNotEmpty) {
+            await prefs.setString('mobile_money_label', label);
+          }
+          if (provider != null && provider.isNotEmpty) {
+            await prefs.setString('mobile_money_provider', provider);
+          }
+          if (!mounted) return;
+          setState(() {
+            providerLabel = label ?? savedLabel ?? providerLabel;
+            providerKey = provider ?? savedKey ?? providerKey;
+          });
+          return;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        providerLabel = savedLabel ?? providerLabel;
+        providerKey = savedKey ?? providerKey;
+      });
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        providerLabel = prefs.getString('mobile_money_label') ?? providerLabel;
+        providerKey = prefs.getString('mobile_money_provider') ?? providerKey;
+      });
+    }
   }
 
   Future<void> _loadFeesGroups() async {
@@ -126,17 +174,18 @@ class _MakePaymentState extends State<MakePayment> {
     );
     final prefs = await SharedPreferences.getInstance();
     String? id = await prefs.getString('current_student');
-    String? reference = await DatabaseHelper.instance.getControlNumberByStudentId(id!);
-    final url = Uri.parse(AppData.url+'/payment');
+    String? controlNumber = await DatabaseHelper.instance.getControlNumberByStudentId(id!);
+    final paymentReference = generateReferenceNumberWithPrefix('MTPM');
+    final url = Uri.parse('${AppData.url}/payment');
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
       body: jsonEncode({
         'sender_account': phoneController.text,
         'amount': amountController.text,
         'phone': widget.phone,
-        'control_number':reference,
-        'reference': generateReferenceNumberWithPrefix('MTPM'),
+        'control_number': controlNumber,
+        'reference': paymentReference,
         'service': selectedServiceController.text,
         'fees_group_id': selectedFeesGroupId,
       }),
@@ -144,11 +193,35 @@ class _MakePaymentState extends State<MakePayment> {
     print(response.body);
     if (response.statusCode == 200) {
       final responseBody = jsonDecode(response.body);
+      final data = responseBody is Map ? responseBody['data'] : null;
+      final provider = data is Map ? data['provider']?.toString() : providerKey;
+      final executionUrl = data is Map
+          ? (data['execution_url'] ?? data['checkout_url'])?.toString()
+          : null;
+      if (provider == 'softepay' &&
+          executionUrl != null &&
+          executionUrl.isNotEmpty) {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SoftPayCheckoutScreen(
+              executionUrl: executionUrl,
+              reference: paymentReference,
+            ),
+          ),
+        );
+        return;
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Your Request has been received. We are processing",
-            style: TextStyle(color: Colors.white),
+            data is Map && data['message'] != null
+                ? data['message'].toString()
+                : 'Your request has been received. Confirm the prompt on your phone.',
+            style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
@@ -158,8 +231,15 @@ class _MakePaymentState extends State<MakePayment> {
         context, MaterialPageRoute(builder: (context) => DashboardScreen()),
       );
     } else {
-      Navigator.of(context).pop();
-      final errorMsg = jsonDecode(response.body)['message'] ?? 'Registration Failed';
+      if (mounted) Navigator.of(context).pop();
+      String errorMsg = 'Payment failed';
+      try {
+        final body = jsonDecode(response.body);
+        errorMsg = body['data']?['message']?.toString()
+            ?? body['message']?.toString()
+            ?? errorMsg;
+      } catch (_) {}
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMsg)),
       );
@@ -214,9 +294,10 @@ class _MakePaymentState extends State<MakePayment> {
               ),
 
 
-              const Text(
-                "Pay your school fees securely and conveniently with Malipo Mtandao. Just select a payment service, enter your Phone number, and the fee amount.",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),textAlign: TextAlign.center,
+              Text(
+                "Pay your school fees securely and conveniently with $providerLabel. Just select a payment service, enter your phone number, and the fee amount.",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
+                textAlign: TextAlign.center,
               ),
 
               const SizedBox(height: 15),

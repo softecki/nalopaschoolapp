@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:dodomaapp/src/data/offline_scan_store.dart';
+import 'package:dodomaapp/src/data/offline_sync.dart';
 import 'package:dodomaapp/src/view/screen/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' show PointerDeviceKind;
@@ -12,7 +14,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_data.dart';
 import 'generated/assets.dart';
 
-void main() => runApp(const MyApp());
+void main() {
+  OfflineSync.start();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -125,6 +130,19 @@ class _SplashScreenState extends State< SplashScreen> {
     await each('fees_type', db.insertFeeType);
     await each('fees_group', db.insertFeeGroup);
     await each('bank_accounts', db.insertBankAccounts);
+    final scanStudents = data['scan_students'];
+    if (scanStudents is List) {
+      await OfflineScanStore.saveStudents(scanStudents);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final provider = data['mobile_money_provider']?.toString();
+    final label = data['mobile_money_label']?.toString();
+    if (provider != null && provider.isNotEmpty) {
+      await prefs.setString('mobile_money_provider', provider);
+    }
+    if (label != null && label.isNotEmpty) {
+      await prefs.setString('mobile_money_label', label);
+    }
     // for (var item in data['subject_assign_childrens']) await db.insertSubjectAssignChildren(item);
     // for (var item in data['subject_assigns']) await db.insertSubjectAssign(item);
     // for (var item in data['grades']) await db.insertGrades(item);
