@@ -118,6 +118,8 @@ class _MakePaymentState extends State<MakePayment> {
         '${now.second.toString().padLeft(2, '0')}';
     return '$prefix$formatted';
   }
+  bool get _isSoftPay => SoftPayAccess.canUseSoftPay(widget.phone, providerKey);
+
   Future<void> register(BuildContext context) async {
     if (phoneController.text.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,7 +147,7 @@ class _MakePaymentState extends State<MakePayment> {
       );
       return;
     }
-    if(selectedServiceController.text.length < 2) {
+    if (!_isSoftPay && selectedServiceController.text.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -158,7 +160,7 @@ class _MakePaymentState extends State<MakePayment> {
       );
       return;
     }
-    if (selectedFeesGroupId == null) {
+    if (!_isSoftPay && selectedFeesGroupId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -182,6 +184,11 @@ class _MakePaymentState extends State<MakePayment> {
     String? id = await prefs.getString('current_student');
     String? controlNumber = await DatabaseHelper.instance.getControlNumberByStudentId(id!);
     final paymentReference = generateReferenceNumberWithPrefix('MTPM');
+    final feesGroupId = selectedFeesGroupId ??
+        (feesGroups.isNotEmpty ? feesGroups.first['id'].toString() : '0');
+    final service = _isSoftPay
+        ? 'M-Pesa'
+        : selectedServiceController.text;
     final url = Uri.parse('${AppData.url}/payment');
     final response = await http.post(
       url,
@@ -192,8 +199,8 @@ class _MakePaymentState extends State<MakePayment> {
         'phone': widget.phone,
         'control_number': controlNumber,
         'reference': paymentReference,
-        'service': selectedServiceController.text,
-        'fees_group_id': selectedFeesGroupId,
+        'service': service,
+        'fees_group_id': feesGroupId,
       }),
     );
     print(response.body);
@@ -201,19 +208,19 @@ class _MakePaymentState extends State<MakePayment> {
       final responseBody = jsonDecode(response.body);
       final data = responseBody is Map ? responseBody['data'] : null;
       final provider = data is Map ? data['provider']?.toString() : providerKey;
-      final executionUrl = data is Map
-          ? (data['execution_url'] ?? data['checkout_url'])?.toString()
+      final checkoutUrl = data is Map
+          ? (data['checkout_url'] ?? data['execution_url'])?.toString()
           : null;
       if (SoftPayAccess.canUseSoftPay(widget.phone, provider) &&
-          executionUrl != null &&
-          executionUrl.isNotEmpty) {
+          checkoutUrl != null &&
+          checkoutUrl.isNotEmpty) {
         if (!mounted) return;
         Navigator.of(context).pop();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => SoftPayCheckoutScreen(
-              executionUrl: executionUrl,
+              executionUrl: checkoutUrl,
               reference: paymentReference,
             ),
           ),
@@ -301,44 +308,46 @@ class _MakePaymentState extends State<MakePayment> {
 
 
               Text(
-                "Pay your school fees securely and conveniently with $providerLabel. Just select a payment service, enter your phone number, and the fee amount.",
+                _isSoftPay
+                    ? 'Pay your school fees with SoftPay. Enter the phone number and amount, then continue on the payment page.'
+                    : 'Pay your school fees securely and conveniently with $providerLabel. Just select a payment service, enter your phone number, and the fee amount.',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
                 textAlign: TextAlign.center,
               ),
 
               const SizedBox(height: 15),
 
-              // Fees Group Dropdown
-              _buildSunkenField(
-                child: isLoadingGroups
-                  ? Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Select Fees Group',
-                        border: InputBorder.none,
+              if (!_isSoftPay) ...[
+                _buildSunkenField(
+                  child: isLoadingGroups
+                    ? Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Select Fees Group',
+                          border: InputBorder.none,
+                        ),
+                        value: selectedFeesGroupId,
+                        onChanged: (String? newId) {
+                          setState(() {
+                            selectedFeesGroupId = newId;
+                          });
+                        },
+                        items: feesGroups
+                            .map((group) => DropdownMenuItem<String>(
+                                  value: group['id'].toString(),
+                                  child: Text(group['name'] ?? ''),
+                                ))
+                            .toList(),
                       ),
-                      value: selectedFeesGroupId,
-                      onChanged: (String? newId) {
-                        setState(() {
-                          selectedFeesGroupId = newId;
-                        });
-                      },
-                      items: feesGroups
-                          .map((group) => DropdownMenuItem<String>(
-                                value: group['id'].toString(),
-                                child: Text(group['name'] ?? ''),
-                              ))
-                          .toList(),
-                    ),
-              ),
+                ),
+                const SizedBox(height: 15),
+                MobileMoneyDropdown(selectedServiceController),
+                const SizedBox(height: 15),
+              ],
 
-              const SizedBox(height: 15),
-              MobileMoneyDropdown(selectedServiceController),
-              const SizedBox(height: 15),
-              // Sunken Phone Input
               _buildSunkenField(
                 child: CustomTextField(
                   hintText: "Enter Phone number",
@@ -350,7 +359,6 @@ class _MakePaymentState extends State<MakePayment> {
 
               const SizedBox(height: 15),
 
-              // Sunken Amount Input
               _buildSunkenField(
                 child: CustomTextField(
                   hintText: "Enter Amount",
@@ -362,11 +370,10 @@ class _MakePaymentState extends State<MakePayment> {
 
               const SizedBox(height: 15),
 
-              // Sunken Button
               _buildSunkenField(
                 child: CustomButton(
                   onPressed: () => register(context),
-                  text: 'Pay',
+                  text: _isSoftPay ? 'Create collection' : 'Pay',
                 ),
               ),
             ],

@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
-/// Loads SoftPay's execution URL so the parent can finish the payment.
+/// Loads SoftPay checkout_url so the parent can finish the payment.
 class SoftPayCheckoutScreen extends StatefulWidget {
   final String executionUrl;
   final String reference;
@@ -19,6 +19,8 @@ class SoftPayCheckoutScreen extends StatefulWidget {
     required this.executionUrl,
     required this.reference,
   });
+
+  String get checkoutUrl => executionUrl;
 
   @override
   State<SoftPayCheckoutScreen> createState() => _SoftPayCheckoutScreenState();
@@ -115,7 +117,7 @@ class _SoftPayCheckoutScreenState extends State<SoftPayCheckoutScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: AppColor.primaryColor,
-        title: const Text('Complete payment', style: TextStyle(color: Colors.white)),
+        title: const Text('Checkout', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           TextButton(
