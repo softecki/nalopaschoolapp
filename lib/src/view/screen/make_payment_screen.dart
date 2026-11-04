@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/app_color.dart';
 import '../../../core/app_data.dart';
+import '../../../core/softpay_access.dart';
 import '../../../generated/assets.dart';
 import '../../data/database_helper.dart';
 import '../widget/custom_button.dart';
@@ -44,43 +45,48 @@ class _MakePaymentState extends State<MakePayment> {
   Future<void> _loadProvider() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedLabel = prefs.getString('mobile_money_label');
+      final loginPhone = widget.phone;
       final savedKey = prefs.getString('mobile_money_provider');
+      final uri = Uri.parse('${AppData.url}/payment/provider').replace(
+        queryParameters: {'phone': loginPhone},
+      );
       final response = await http.get(
-        Uri.parse('${AppData.url}/payment/provider'),
+        uri,
         headers: {'Accept': 'application/json'},
       ).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         final data = body is Map ? body['data'] : null;
         if (data is Map) {
-          final label = data['label']?.toString();
-          final provider = data['provider']?.toString();
-          if (label != null && label.isNotEmpty) {
-            await prefs.setString('mobile_money_label', label);
-          }
-          if (provider != null && provider.isNotEmpty) {
-            await prefs.setString('mobile_money_provider', provider);
-          }
+          final rawProvider = data['provider']?.toString() ?? savedKey;
+          final provider = SoftPayAccess.effectiveProvider(loginPhone, rawProvider);
+          final label = SoftPayAccess.labelFor(provider);
+          await prefs.setString('mobile_money_provider', provider);
+          await prefs.setString('mobile_money_label', label);
           if (!mounted) return;
           setState(() {
-            providerLabel = label ?? savedLabel ?? providerLabel;
-            providerKey = provider ?? savedKey ?? providerKey;
+            providerKey = provider;
+            providerLabel = label;
           });
           return;
         }
       }
       if (!mounted) return;
+      final provider = SoftPayAccess.effectiveProvider(loginPhone, savedKey);
       setState(() {
-        providerLabel = savedLabel ?? providerLabel;
-        providerKey = savedKey ?? providerKey;
+        providerKey = provider;
+        providerLabel = SoftPayAccess.labelFor(provider);
       });
     } catch (_) {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
+      final provider = SoftPayAccess.effectiveProvider(
+        widget.phone,
+        prefs.getString('mobile_money_provider'),
+      );
       setState(() {
-        providerLabel = prefs.getString('mobile_money_label') ?? providerLabel;
-        providerKey = prefs.getString('mobile_money_provider') ?? providerKey;
+        providerKey = provider;
+        providerLabel = SoftPayAccess.labelFor(provider);
       });
     }
   }
@@ -198,7 +204,7 @@ class _MakePaymentState extends State<MakePayment> {
       final executionUrl = data is Map
           ? (data['execution_url'] ?? data['checkout_url'])?.toString()
           : null;
-      if (provider == 'softepay' &&
+      if (SoftPayAccess.canUseSoftPay(widget.phone, provider) &&
           executionUrl != null &&
           executionUrl.isNotEmpty) {
         if (!mounted) return;

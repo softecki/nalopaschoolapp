@@ -135,13 +135,19 @@ class _SplashScreenState extends State< SplashScreen> {
       await OfflineScanStore.saveStudents(scanStudents);
     }
     final prefs = await SharedPreferences.getInstance();
+    // Splash has no login phone; SoftPay is resolved later with phone on
+    // /payment/provider. Persist splash values only when not SoftPay so a
+    // previous SoftPay session cannot leak branding to other users.
     final provider = data['mobile_money_provider']?.toString();
     final label = data['mobile_money_label']?.toString();
-    if (provider != null && provider.isNotEmpty) {
+    if (provider != null && provider.isNotEmpty && provider != 'softepay') {
       await prefs.setString('mobile_money_provider', provider);
-    }
-    if (label != null && label.isNotEmpty) {
-      await prefs.setString('mobile_money_label', label);
+      if (label != null && label.isNotEmpty) {
+        await prefs.setString('mobile_money_label', label);
+      }
+    } else if (provider == 'softepay') {
+      await prefs.setString('mobile_money_provider', 'malipo');
+      await prefs.setString('mobile_money_label', 'Malipo Mtandao');
     }
     // for (var item in data['subject_assign_childrens']) await db.insertSubjectAssignChildren(item);
     // for (var item in data['subject_assigns']) await db.insertSubjectAssign(item);

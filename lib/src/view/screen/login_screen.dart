@@ -1,4 +1,5 @@
 import 'package:dodomaapp/core/app_color.dart';
+import 'package:dodomaapp/core/softpay_access.dart';
 import 'package:dodomaapp/generated/assets.dart';
 import 'package:dodomaapp/src/view/screen/menu_screen.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +50,13 @@ class LoginScreen extends StatelessWidget {
 
     if (response.statusCode == 200) {
       final prefs =  await SharedPreferences.getInstance();
-      prefs.setString('code_number', emailController.text.toString());
+      final loginPhone = emailController.text.toString();
+      prefs.setString('code_number', loginPhone);
+      // SoftPay branding only for the allowlisted login phone.
+      if (!SoftPayAccess.isAllowed(loginPhone)) {
+        await prefs.setString('mobile_money_provider', 'malipo');
+        await prefs.setString('mobile_money_label', 'Malipo Mtandao');
+      }
       final user = await DatabaseHelper.instance.getUserByEmail(email);
       final responseBody = jsonDecode(response.body);
       final userData = Map<String, dynamic>.from(responseBody['data']['user'] as Map);
